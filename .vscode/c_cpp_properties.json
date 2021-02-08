@@ -1,0 +1,23 @@
+{
+  "configurations": [
+    {
+      "cStandard": "c11",
+      "compilerPath": "/usr/bin/arm-none-eabi-g++",
+      "cppStandard": "c++17",
+      "defines": [
+        "_DEBUG",
+        "UNICODE",
+        "_UNICODE"
+      ],
+      "includePath": [
+        "${workspaceFolder}/**",
+        "/home/tomato/.pkg/DaisyExamples/libdaisy/src/",
+        "/home/tomato/.pkg/DaisyExamples/libdaisy/Drivers/CMSIS/Include",
+        "${workspaceFolder}/../../libDaisy/**",
+        "${workspaceFolder}/../../DaisySP/**"
+      ],
+      "name": "Unix"
+    }
+  ],
+  "version": 4
+}
