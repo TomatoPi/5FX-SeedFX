@@ -19,7 +19,7 @@ U 1 1 6020F3BC
 P 2900 2850
 F 0 "J2" H 2980 2842 50  0000 L CNN
 F 1 "Conn_01x20" H 2980 2751 50  0000 L CNN
-F 2 "Connector_PinHeader_1.27mm:PinHeader_1x20_P1.27mm_Horizontal" H 2900 2850 50  0001 C CNN
+F 2 "Connector_PinHeader_1.27mm:PinHeader_1x20_P1.27mm_Vertical" H 2900 2850 50  0001 C CNN
 F 3 "~" H 2900 2850 50  0001 C CNN
 	1    2900 2850
 	1    0    0    -1  
@@ -30,7 +30,7 @@ U 1 1 60211ADD
 P 3500 2950
 F 0 "J3" H 3418 1725 50  0000 C CNN
 F 1 "Conn_01x20" H 3418 1816 50  0000 C CNN
-F 2 "Connector_PinHeader_1.27mm:PinHeader_1x20_P1.27mm_Horizontal" H 3500 2950 50  0001 C CNN
+F 2 "Connector_PinHeader_1.27mm:PinHeader_1x20_P1.27mm_Vertical" H 3500 2950 50  0001 C CNN
 F 3 "~" H 3500 2950 50  0001 C CNN
 	1    3500 2950
 	-1   0    0    1   

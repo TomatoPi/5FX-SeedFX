@@ -19,7 +19,7 @@ U 1 1 6020F3BC
 P 2900 2850
 F 0 "J2" H 2980 2842 50  0000 L CNN
 F 1 "Conn_01x20" H 2980 2751 50  0000 L CNN
-F 2 "Connector_PinHeader_1.27mm:PinHeader_1x20_P1.27mm_Vertical" H 2900 2850 50  0001 C CNN
+F 2 "Connector_PinHeader_2.54mm:PinHeader_1x20_P2.54mm_Vertical" H 2900 2850 50  0001 C CNN
 F 3 "~" H 2900 2850 50  0001 C CNN
 	1    2900 2850
 	1    0    0    -1  
@@ -30,7 +30,7 @@ U 1 1 60211ADD
 P 3500 2950
 F 0 "J3" H 3418 1725 50  0000 C CNN
 F 1 "Conn_01x20" H 3418 1816 50  0000 C CNN
-F 2 "Connector_PinHeader_1.27mm:PinHeader_1x20_P1.27mm_Vertical" H 3500 2950 50  0001 C CNN
+F 2 "Connector_PinHeader_2.54mm:PinHeader_1x20_P2.54mm_Vertical" H 3500 2950 50  0001 C CNN
 F 3 "~" H 3500 2950 50  0001 C CNN
 	1    3500 2950
 	-1   0    0    1   
@@ -41,7 +41,7 @@ U 1 1 60215458
 P 5600 1900
 F 0 "U1" H 5600 2267 50  0000 C CNN
 F 1 "OPA2134" H 5600 2176 50  0000 C CNN
-F 2 "Package_DIP:DIP-8-16_W7.62mm" H 5600 1900 50  0001 C CNN
+F 2 "Package_DIP:DIP-8_W7.62mm" H 5600 1900 50  0001 C CNN
 F 3 "http://www.ti.com/lit/ds/symlink/opa134.pdf" H 5600 1900 50  0001 C CNN
 	1    5600 1900
 	1    0    0    -1  
@@ -206,7 +206,7 @@ U 2 1 602489B6
 P 5900 3150
 F 0 "U1" H 5900 3517 50  0000 C CNN
 F 1 "OPA2134" H 5900 3426 50  0000 C CNN
-F 2 "Package_DIP:DIP-8-16_W7.62mm" H 5900 3150 50  0001 C CNN
+F 2 "Package_DIP:DIP-8_W7.62mm" H 5900 3150 50  0001 C CNN
 F 3 "http://www.ti.com/lit/ds/symlink/opa134.pdf" H 5900 3150 50  0001 C CNN
 	2    5900 3150
 	1    0    0    -1  
@@ -356,7 +356,7 @@ U 1 1 6024A5C0
 P 7350 1900
 F 0 "J6" H 7170 1883 50  0000 R CNN
 F 1 "AudioJack2" H 7170 1974 50  0000 R CNN
-F 2 "Connector_PinHeader_1.27mm:PinHeader_1x02_P1.27mm_Vertical" H 7350 1900 50  0001 C CNN
+F 2 "Connector_Audio:Jack_6.35mm_Neutrik_NMJ4HFD2_Horizontal" H 7350 1900 50  0001 C CNN
 F 3 "~" H 7350 1900 50  0001 C CNN
 	1    7350 1900
 	-1   0    0    1   
@@ -367,7 +367,7 @@ U 1 1 6024ACA5
 P 7650 3150
 F 0 "J7" H 7470 3133 50  0000 R CNN
 F 1 "AudioJack2" H 7470 3224 50  0000 R CNN
-F 2 "Connector_PinHeader_1.27mm:PinHeader_1x02_P1.27mm_Vertical" H 7650 3150 50  0001 C CNN
+F 2 "Connector_Audio:Jack_6.35mm_Neutrik_NMJ4HFD2_Horizontal" H 7650 3150 50  0001 C CNN
 F 3 "~" H 7650 3150 50  0001 C CNN
 	1    7650 3150
 	-1   0    0    1   
@@ -480,7 +480,7 @@ U 1 1 60255F86
 P 2600 5300
 F 0 "RV1" H 2530 5346 50  0000 R CNN
 F 1 "5k" H 2530 5255 50  0000 R CNN
-F 2 "Potentiometer_THT:Potentiometer_Bourns_3006P_Horizontal" H 2600 5300 50  0001 C CNN
+F 2 "Potentiometer_THT:Potentiometer_Bourns_3296W_Vertical" H 2600 5300 50  0001 C CNN
 F 3 "~" H 2600 5300 50  0001 C CNN
 	1    2600 5300
 	1    0    0    -1  
@@ -739,7 +739,7 @@ U 1 1 60292AAF
 P 5500 4400
 F 0 "U2" H 5500 4033 50  0000 C CNN
 F 1 "OPA2134" H 5500 4124 50  0000 C CNN
-F 2 "Package_DIP:DIP-8-16_W7.62mm" H 5500 4400 50  0001 C CNN
+F 2 "Package_DIP:DIP-8_W7.62mm" H 5500 4400 50  0001 C CNN
 F 3 "http://www.ti.com/lit/ds/symlink/opa134.pdf" H 5500 4400 50  0001 C CNN
 	1    5500 4400
 	-1   0    0    1   
@@ -841,7 +841,7 @@ U 1 1 602AF393
 P 6700 4500
 F 0 "J4" H 6520 4483 50  0000 R CNN
 F 1 "AudioJack2" H 6520 4574 50  0000 R CNN
-F 2 "Connector_PinHeader_1.27mm:PinHeader_1x02_P1.27mm_Vertical" H 6700 4500 50  0001 C CNN
+F 2 "Connector_Audio:Jack_6.35mm_Neutrik_NMJ4HFD2_Horizontal" H 6700 4500 50  0001 C CNN
 F 3 "~" H 6700 4500 50  0001 C CNN
 	1    6700 4500
 	-1   0    0    1   
@@ -870,7 +870,7 @@ U 1 1 602C0D9B
 P 5050 6400
 F 0 "U3" H 5050 6767 50  0000 C CNN
 F 1 "OPA2134" H 5050 6676 50  0000 C CNN
-F 2 "Package_DIP:DIP-8-16_W7.62mm" H 5050 6400 50  0001 C CNN
+F 2 "Package_DIP:DIP-8_W7.62mm" H 5050 6400 50  0001 C CNN
 F 3 "http://www.ti.com/lit/ds/symlink/opa134.pdf" H 5050 6400 50  0001 C CNN
 	1    5050 6400
 	1    0    0    -1  
@@ -960,7 +960,7 @@ U 2 1 6030807F
 P 5950 5800
 F 0 "U2" H 5950 5433 50  0000 C CNN
 F 1 "OPA2134" H 5950 5524 50  0000 C CNN
-F 2 "Package_DIP:DIP-8-16_W7.62mm" H 5950 5800 50  0001 C CNN
+F 2 "Package_DIP:DIP-8_W7.62mm" H 5950 5800 50  0001 C CNN
 F 3 "http://www.ti.com/lit/ds/symlink/opa134.pdf" H 5950 5800 50  0001 C CNN
 	2    5950 5800
 	-1   0    0    1   
@@ -1052,7 +1052,7 @@ U 1 1 603080B2
 P 7150 5900
 F 0 "J5" H 6970 5883 50  0000 R CNN
 F 1 "AudioJack2" H 6970 5974 50  0000 R CNN
-F 2 "Connector_PinHeader_1.27mm:PinHeader_1x02_P1.27mm_Vertical" H 7150 5900 50  0001 C CNN
+F 2 "Connector_Audio:Jack_6.35mm_Neutrik_NMJ4HFD2_Horizontal" H 7150 5900 50  0001 C CNN
 F 3 "~" H 7150 5900 50  0001 C CNN
 	1    7150 5900
 	-1   0    0    1   
@@ -1121,7 +1121,7 @@ U 3 1 60321F10
 P 9250 1100
 F 0 "U1" H 9208 1146 50  0000 L CNN
 F 1 "OPA2134" H 9208 1055 50  0000 L CNN
-F 2 "Package_DIP:DIP-8-16_W7.62mm" H 9250 1100 50  0001 C CNN
+F 2 "Package_DIP:DIP-8_W7.62mm" H 9250 1100 50  0001 C CNN
 F 3 "http://www.ti.com/lit/ds/symlink/opa134.pdf" H 9250 1100 50  0001 C CNN
 	3    9250 1100
 	1    0    0    -1  
@@ -1132,7 +1132,7 @@ U 3 1 60325F09
 P 9500 2150
 F 0 "U2" H 9458 2196 50  0000 L CNN
 F 1 "OPA2134" H 9458 2105 50  0000 L CNN
-F 2 "Package_DIP:DIP-8-16_W7.62mm" H 9500 2150 50  0001 C CNN
+F 2 "Package_DIP:DIP-8_W7.62mm" H 9500 2150 50  0001 C CNN
 F 3 "http://www.ti.com/lit/ds/symlink/opa134.pdf" H 9500 2150 50  0001 C CNN
 	3    9500 2150
 	1    0    0    -1  
@@ -1143,7 +1143,7 @@ U 3 1 6032F8DD
 P 9250 3250
 F 0 "U3" H 9208 3296 50  0000 L CNN
 F 1 "OPA2134" H 9208 3205 50  0000 L CNN
-F 2 "Package_DIP:DIP-8-16_W7.62mm" H 9250 3250 50  0001 C CNN
+F 2 "Package_DIP:DIP-8_W7.62mm" H 9250 3250 50  0001 C CNN
 F 3 "http://www.ti.com/lit/ds/symlink/opa134.pdf" H 9250 3250 50  0001 C CNN
 	3    9250 3250
 	1    0    0    -1  

@@ -86,18 +86,19 @@ int main(void) {
   hw.Configure();
   hw.Init();
 
-  ga.Init(hw.AudioSampleRate(), 25.f, 7.f, 60.f, 0.f);
-  gb.Init(hw.AudioSampleRate(), 25.f, 7.f, 60.f, 0.5f);
+  ga.Init(hw.AudioSampleRate(), 500.f, 17.f, 100.f, 0.f);
+  gb.Init(hw.AudioSampleRate(), 500.f, 17.f, 100.f, 0.5f);
 
-  ga.setDepth(0.005f);
-  gb.setDepth(0.005f);
+  ga.setDepth(0.02f);
+  gb.setDepth(0.02f);
 
   write_h = 0;
 
   window_buffer = new float[ga.grain_length];
   float N_2 = ga.grain_length / 2.f;
   for (size_t i = 0; i < ga.grain_length; ++i) {
-    float w = 1.f - abs((i - N_2) / N_2);
+    // float w = 1.f - abs((i - N_2) / N_2);
+    float w = sin((M_PI * i) / (float)(ga.grain_length));
     window_buffer[i] = w;
   }
 
