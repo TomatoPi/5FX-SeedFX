@@ -1,5 +1,6 @@
 #include "src/Chorus.hpp"
 #include "src/Utils.hpp"
+#include "src/Looper.hpp"
 
 #include <daisy_seed.h>
 #include <per/uart.h>
@@ -8,11 +9,13 @@
 
 daisy::DaisySeed hw;
 sfx::ChorusEngine<8, daisysp::SmoothRandomGenerator> chorus;
+sfx::LooperEngine looper;
 
 void channel_0_callback(float* in, float* out, size_t nsamples)
 {
   for (size_t i = 0; i < nsamples; ++i) {
-    out[i] = chorus.Process(in[i]);
+    float sample = chorus.Process(in[i]);
+    out[i] = looper.Process(sample);
   }
 }
 
@@ -45,8 +48,8 @@ int main(void)
     chorus.Init(hw.AudioSampleRate(), 100.f, freqs, delays, 100.f, 2);
     chorus.SetDepths(depths);
 
-    chorus.dry = -3db;
-    chorus.wet = -3db;
+    chorus.dry = -3dB;
+    chorus.wet = -3dB;
     chorus.feedback = 0.f;
 
     size_t N = chorus.granulators[0].grain_length;
@@ -55,6 +58,10 @@ int main(void)
       float w = sin((M_PI * i) / (float)(N));
       chorus.window[i] = w;
     }
+  }
+
+  {
+    looper.Init(hw.AudioSampleRate(), 10.f);
   }
 
   hw.StartAudio(AudioCallback);

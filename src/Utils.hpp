@@ -45,11 +45,11 @@ namespace sfx
   }
 }
 
-constexpr float operator"" db(long double db)
+constexpr float operator"" dB(long double db)
 {
   return sfx::db2rms(db);
 }
-constexpr float operator"" db(unsigned long long int db)
+constexpr float operator"" dB(unsigned long long int db)
 {
   return sfx::db2rms(db);
 }
