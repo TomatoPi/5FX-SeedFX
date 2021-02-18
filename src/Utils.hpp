@@ -61,22 +61,17 @@ constexpr float operator"" dB(unsigned long long int db)
 namespace sfx
 {
   /* Buffer */
-
   void Buffer::Init(size_t size)
   {
-    size_t upbound = 1;
-    while (upbound < size) {
-      upbound = upbound << 1;
-    }
-    length = upbound;
-    lengthmod = upbound - 1;
+    buffer = new float[size];
+    length = size;
+    lengthmod = size - 1;
     write_h = 0;
-    buffer = new float[length];
   }
   void Buffer::Write(float x)
   {
-    buffer[write_h] = x;
     write_h = (write_h + 1) & lengthmod;
+    buffer[write_h] = x;
   }
   float Buffer::Read(float t) const
   {

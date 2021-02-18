@@ -73,7 +73,7 @@ namespace sfx
     void Init(
       float sr, float grain,
       float* fs, float* ds,
-      float maxlength,
+      size_t buffersize,
       size_t size);
     void SetDepths(float* depths);
     float Read();
@@ -94,7 +94,7 @@ namespace sfx
   void ChorusEngine<CloudSizeMax, LFO>::Granulator::Grain::Init(float sr, float freq, float phase, const Granulator& g)
   {
 
-    time += g.grain_length * phase;
+    time = (time + (size_t)(g.grain_length * phase)) % g.grain_length;
     read_h = static_cast<float>(g.anchor);
 
     lfo.Init(sr);
@@ -107,16 +107,15 @@ namespace sfx
     const float* window,
     const Buffer& buffer)
   {
-
-    float sample = window[time] * buffer.Read(read_h);
     time = (time + 1) % g.grain_length;
     if (0 == time) {
       read_h = static_cast<float>(g.anchor);
     } else {
       read_h += 1.f;
     }
-    read_h = fmod(read_h + g.depth * lfo.Process(), buffer.length);
-    return sample;
+    read_h = read_h + g.depth * lfo.Process();
+    read_h = fmod(read_h, buffer.length);
+    return window[time] * buffer.Read(read_h);
   }
 
   /* Granulator */
@@ -146,9 +145,8 @@ namespace sfx
     const float* window,
     const Buffer& buffer)
   {
-    float sample = ga.Read(*this, window, buffer) + gb.Read(*this, window, buffer);
     anchor = (anchor + 1) & buffer.lengthmod;
-    return sample;
+    return ga.Read(*this, window, buffer) + gb.Read(*this, window, buffer);
   }
 
   /* Engine */
@@ -157,15 +155,22 @@ namespace sfx
   void ChorusEngine<CloudSizeMax, LFO>::Init(
     float sr, float grain,
     float* fs, float* ds,
-    float maxlength,
+    size_t buffersize,
     size_t s)
   {
     size = s;
-    buffer.Init(maxlength * 0.001f * sr);
+    buffer.Init(buffersize);
     for (size_t i = 0; i < size; ++i) {
       granulators[i].Init(sr, fs[i], ds[i], grain, buffer.length);
     }
-    window = new float[granulators[0].grain_length];
+    size_t N = granulators[0].grain_length;
+    window = new float[N];
+    for (size_t i = 0; i < N; ++i) {
+      float w = sin((M_PI * i) / (float)(N));
+      window[i] = w;
+    }
+    dry = wet = 0.5f;
+    feedback = 0.f;
   }
 
   template <size_t CloudSizeMax, typename LFO>

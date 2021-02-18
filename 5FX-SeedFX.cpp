@@ -1,11 +1,13 @@
 #include "src/Chorus.hpp"
 #include "src/Utils.hpp"
 #include "src/Looper.hpp"
+// #include "src/Midi.hpp"
 
 #include <daisy_seed.h>
 #include <per/uart.h>
 
 #include <Utility/smooth_random.h>
+#include <Noise/clockednoise.h>
 
 daisy::DaisySeed hw;
 sfx::ChorusEngine<8, daisysp::SmoothRandomGenerator> chorus;
@@ -40,29 +42,14 @@ int main(void)
   hw.Configure();
   hw.Init();
 
-  {
-    float freqs[] = { 25.f, 10.f };
-    float delays[] = { 17.f, 10.f };
-    float depths[] = { 0.015f, 0.021f };
+  float freqs[] = { 25.f, 10.f };
+  float delays[] = { 17.f, 10.f };
+  float depths[] = { 0.015f, 0.021f };
 
-    chorus.Init(hw.AudioSampleRate(), 100.f, freqs, delays, 100.f, 2);
-    chorus.SetDepths(depths);
+  chorus.Init(hw.AudioSampleRate(), 100.f, freqs, delays, 1 << 16, 2);
+  chorus.SetDepths(depths);
 
-    chorus.dry = -3dB;
-    chorus.wet = -3dB;
-    chorus.feedback = 0.f;
-
-    size_t N = chorus.granulators[0].grain_length;
-    for (size_t i = 0; i < N; ++i) {
-      // float w = 1.f - abs((i - N_2) / N_2);
-      float w = sin((M_PI * i) / (float)(N));
-      chorus.window[i] = w;
-    }
-  }
-
-  {
-    looper.Init(hw.AudioSampleRate(), 10.f);
-  }
+  looper.Init(hw.AudioSampleRate(), 10.f);
 
   hw.StartAudio(AudioCallback);
 
