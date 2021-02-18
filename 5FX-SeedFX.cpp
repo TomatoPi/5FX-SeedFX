@@ -1,5 +1,6 @@
 #include "src/Chorus.hpp"
 #include "src/Utils.hpp"
+#include "src/Looper.hpp"
 
 #include <daisy_seed.h>
 #include <per/uart.h>
