@@ -7,7 +7,7 @@
 #include <Utility/smooth_random.h>
 
 daisy::DaisySeed hw;
-sfx::ChorusEngine<1 << 16, 1 << 16, 8, daisysp::SmoothRandomGenerator> chorus;
+sfx::ChorusEngine<8, daisysp::SmoothRandomGenerator> chorus;
 
 void channel_0_callback(float* in, float* out, size_t nsamples) {
 
@@ -40,7 +40,7 @@ int main(void) {
     float delays[] = { 17.f, 10.f };
     float depths[] = { 0.015f, 0.021f };
 
-    chorus.Init(hw.AudioSampleRate(), 100.f, freqs, delays, 2);
+    chorus.Init(hw.AudioSampleRate(), 100.f, freqs, delays, 100.f, 2);
     chorus.SetDepths(depths);
 
     chorus.dry = -3db;
