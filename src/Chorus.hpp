@@ -108,7 +108,7 @@ namespace sfx
     const Buffer& buffer)
   {
 
-    float sample = window[time] * buffer.Readf(read_h);
+    float sample = window[time] * buffer.Read(read_h);
     time = (time + 1) % g.grain_length;
     if (0 == time) {
       read_h = static_cast<float>(g.anchor);
