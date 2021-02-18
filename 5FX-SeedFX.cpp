@@ -9,26 +9,28 @@
 daisy::DaisySeed hw;
 sfx::ChorusEngine<8, daisysp::SmoothRandomGenerator> chorus;
 
-void channel_0_callback(float* in, float* out, size_t nsamples) {
-
+void channel_0_callback(float* in, float* out, size_t nsamples)
+{
   for (size_t i = 0; i < nsamples; ++i) {
     out[i] = chorus.Process(in[i]);
   }
 }
 
-void channel_1_callback(float* in, float* out, size_t nsamples) {
-
+void channel_1_callback(float* in, float* out, size_t nsamples)
+{
   for (size_t i = 0; i < nsamples; i++) {
     out[i] = in[i];
   }
 }
 
-void AudioCallback(float** in, float** out, size_t size) {
+void AudioCallback(float** in, float** out, size_t size)
+{
   channel_0_callback(in[0], out[0], size);
   channel_1_callback(in[1], out[1], size);
 }
 
-int main(void) {
+int main(void)
+{
 
   bool state(false);
 
