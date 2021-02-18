@@ -1,0 +1,238 @@
+EESchema Schematic File Version 4
+EELAYER 30 0
+EELAYER END
+$Descr A4 11693 8268
+encoding utf-8
+Sheet 1 1
+Title ""
+Date ""
+Rev ""
+Comp ""
+Comment1 ""
+Comment2 ""
+Comment3 ""
+Comment4 ""
+$EndDescr
+$Comp
+L Isolator:SFH617A-1 U?
+U 1 1 602B5F16
+P 3650 2100
+F 0 "U?" H 3650 2425 50  0000 C CNN
+F 1 "SFH617A-1" H 3650 2334 50  0000 C CNN
+F 2 "Package_DIP:DIP-4_W7.62mm" H 3450 1900 50  0001 L CIN
+F 3 "http://www.vishay.com/docs/83740/sfh617a.pdf" H 3650 2100 50  0001 L CNN
+	1    3650 2100
+	1    0    0    -1  
+$EndComp
+$Comp
+L Device:R R?
+U 1 1 602B8D58
+P 4050 1750
+F 0 "R?" H 4120 1796 50  0000 L CNN
+F 1 "R" H 4120 1705 50  0000 L CNN
+F 2 "" V 3980 1750 50  0001 C CNN
+F 3 "~" H 4050 1750 50  0001 C CNN
+	1    4050 1750
+	1    0    0    -1  
+$EndComp
+$Comp
+L Diode:1N4148 D?
+U 1 1 602B970C
+P 3100 2100
+F 0 "D?" V 3054 2180 50  0000 L CNN
+F 1 "1N4148" V 3145 2180 50  0000 L CNN
+F 2 "Diode_THT:D_DO-35_SOD27_P7.62mm_Horizontal" H 3100 1925 50  0001 C CNN
+F 3 "https://assets.nexperia.com/documents/data-sheet/1N4148_1N4448.pdf" H 3100 2100 50  0001 C CNN
+	1    3100 2100
+	0    1    1    0   
+$EndComp
+Wire Wire Line
+	3350 2000 3300 2000
+Wire Wire Line
+	3300 2000 3300 1900
+Wire Wire Line
+	3300 1900 3100 1900
+Wire Wire Line
+	3100 1900 3100 1950
+Wire Wire Line
+	3100 2250 3100 2300
+Wire Wire Line
+	3100 2300 3300 2300
+Wire Wire Line
+	3300 2300 3300 2200
+Wire Wire Line
+	3300 2200 3350 2200
+$Comp
+L Connector:DIN-5 J?
+U 1 1 602B4333
+P 2200 2100
+F 0 "J?" H 2200 1825 50  0000 C CNN
+F 1 "DIN-5" H 2200 1734 50  0000 C CNN
+F 2 "" H 2200 2100 50  0001 C CNN
+F 3 "http://www.mouser.com/ds/2/18/40_c091_abd_e-75918.pdf" H 2200 2100 50  0001 C CNN
+	1    2200 2100
+	1    0    0    -1  
+$EndComp
+$Comp
+L Device:R R?
+U 1 1 602BAC15
+P 2750 2300
+F 0 "R?" V 2543 2300 50  0000 C CNN
+F 1 "R" V 2634 2300 50  0000 C CNN
+F 2 "" V 2680 2300 50  0001 C CNN
+F 3 "~" H 2750 2300 50  0001 C CNN
+	1    2750 2300
+	0    1    1    0   
+$EndComp
+Wire Wire Line
+	2900 2300 3100 2300
+Connection ~ 3100 2300
+Wire Wire Line
+	3950 2000 4050 2000
+Wire Wire Line
+	4050 2000 4050 1900
+$Comp
+L power:GND #PWR?
+U 1 1 602BC46A
+P 4050 2300
+F 0 "#PWR?" H 4050 2050 50  0001 C CNN
+F 1 "GND" H 4055 2127 50  0000 C CNN
+F 2 "" H 4050 2300 50  0001 C CNN
+F 3 "" H 4050 2300 50  0001 C CNN
+	1    4050 2300
+	1    0    0    -1  
+$EndComp
+$Comp
+L power:+5V #PWR?
+U 1 1 602BCAFD
+P 4050 1500
+F 0 "#PWR?" H 4050 1350 50  0001 C CNN
+F 1 "+5V" H 4065 1673 50  0000 C CNN
+F 2 "" H 4050 1500 50  0001 C CNN
+F 3 "" H 4050 1500 50  0001 C CNN
+	1    4050 1500
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	4050 1500 4050 1600
+Wire Wire Line
+	4050 2300 4050 2200
+Wire Wire Line
+	4050 2200 3950 2200
+Wire Wire Line
+	2750 2000 2750 1900
+Connection ~ 3100 1900
+Wire Wire Line
+	2600 2300 2550 2300
+Wire Wire Line
+	2550 2300 2550 2350
+Wire Wire Line
+	2550 2350 1800 2350
+Wire Wire Line
+	1800 2350 1800 2000
+Wire Wire Line
+	1800 2000 1900 2000
+$Comp
+L power:GND #PWR?
+U 1 1 602BE073
+P 2200 1700
+F 0 "#PWR?" H 2200 1450 50  0001 C CNN
+F 1 "GND" H 2205 1527 50  0000 C CNN
+F 2 "" H 2200 1700 50  0001 C CNN
+F 3 "" H 2200 1700 50  0001 C CNN
+	1    2200 1700
+	-1   0    0    1   
+$EndComp
+Text GLabel 4150 2000 2    50   Input ~ 0
+Rx
+Wire Wire Line
+	4150 2000 4050 2000
+Connection ~ 4050 2000
+Text Label 2500 1900 0    50   ~ 0
++5V
+Text Label 1900 1900 2    50   ~ 0
+Data
+Text Label 2250 1750 0    50   ~ 0
+Gnd
+Wire Wire Line
+	2750 2000 2500 2000
+Wire Wire Line
+	2750 1900 3100 1900
+$Comp
+L Connector:DIN-5 J?
+U 1 1 602C282A
+P 2200 3150
+F 0 "J?" H 2200 2875 50  0000 C CNN
+F 1 "DIN-5" H 2200 2784 50  0000 C CNN
+F 2 "" H 2200 3150 50  0001 C CNN
+F 3 "http://www.mouser.com/ds/2/18/40_c091_abd_e-75918.pdf" H 2200 3150 50  0001 C CNN
+	1    2200 3150
+	1    0    0    -1  
+$EndComp
+$Comp
+L Device:R R?
+U 1 1 602C2EF8
+P 1650 3050
+F 0 "R?" V 1443 3050 50  0000 C CNN
+F 1 "R" V 1534 3050 50  0000 C CNN
+F 2 "" V 1580 3050 50  0001 C CNN
+F 3 "~" H 1650 3050 50  0001 C CNN
+	1    1650 3050
+	0    1    1    0   
+$EndComp
+$Comp
+L Device:R R?
+U 1 1 602C311C
+P 2750 3050
+F 0 "R?" V 2543 3050 50  0000 C CNN
+F 1 "R" V 2634 3050 50  0000 C CNN
+F 2 "" V 2680 3050 50  0001 C CNN
+F 3 "~" H 2750 3050 50  0001 C CNN
+	1    2750 3050
+	0    1    1    0   
+$EndComp
+$Comp
+L power:GND #PWR?
+U 1 1 602C373C
+P 2200 2750
+F 0 "#PWR?" H 2200 2500 50  0001 C CNN
+F 1 "GND" H 2205 2577 50  0000 C CNN
+F 2 "" H 2200 2750 50  0001 C CNN
+F 3 "" H 2200 2750 50  0001 C CNN
+	1    2200 2750
+	-1   0    0    1   
+$EndComp
+$Comp
+L power:+5V #PWR?
+U 1 1 602C3A8E
+P 3000 2950
+F 0 "#PWR?" H 3000 2800 50  0001 C CNN
+F 1 "+5V" H 3015 3123 50  0000 C CNN
+F 2 "" H 3000 2950 50  0001 C CNN
+F 3 "" H 3000 2950 50  0001 C CNN
+	1    3000 2950
+	1    0    0    -1  
+$EndComp
+Text GLabel 1400 3050 0    50   Input ~ 0
+Tx
+Wire Wire Line
+	1500 3050 1400 3050
+Wire Wire Line
+	1800 3050 1900 3050
+Wire Wire Line
+	2200 2850 2200 2750
+Wire Wire Line
+	2500 3050 2600 3050
+Wire Wire Line
+	2900 3050 3000 3050
+Wire Wire Line
+	3000 3050 3000 2950
+Text Label 2500 2950 0    50   ~ 0
++5V
+Text Label 1900 2950 2    50   ~ 0
+Data
+Text Label 2250 2800 0    50   ~ 0
+Gnd
+Wire Wire Line
+	2200 1800 2200 1700
+$EndSCHEMATC

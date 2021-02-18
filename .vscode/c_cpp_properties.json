@@ -11,8 +11,11 @@
       ],
       "includePath": [
         "${workspaceFolder}/**",
-        "/home/tomato/.pkg/DaisyExamples/libdaisy/src/",
+        "/home/tomato/.pkg/DaisyExamples/libdaisy/src",
+        "/home/tomato/.pkg/DaisyExamples/libdaisy/src/sys",
         "/home/tomato/.pkg/DaisyExamples/libdaisy/Drivers/CMSIS/Include",
+        "/home/tomato/.pkg/DaisyExamples/libdaisy/Drivers/STM32H7xx_HAL_Driver/Inc",
+        "/home/tomato/.pkg/DaisyExamples/libdaisy/Drivers/CMSIS/Device/ST/STM32H7xx/Include",
         "${workspaceFolder}/../../libDaisy/**",
         "${workspaceFolder}/../../DaisySP/**"
       ],

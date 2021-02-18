@@ -1,7 +1,11 @@
 #include <daisy_seed.h>
+#include <per/uart.h>
+#include <stm32h7xx_hal_usart.h>
 
 #include <Utility/smooth_random.h>
 #include <Utility/delayline.h>
+
+#include <initializer_list>
 
 daisy::DaisySeed hw;
 
@@ -26,22 +30,46 @@ void write(float x) {
 }
 
 struct Granulator {
-  daisysp::SmoothRandomGenerator lfo;
-  size_t anchor, grain_length, time;
-  float read_h;
+
+  struct Grain {
+    daisysp::SmoothRandomGenerator lfo;
+    size_t time;
+    float read_h;
+
+    void Init(float sr, float freq, float phase, const Granulator& g) {
+      time += g.grain_length * phase;
+      read_h = static_cast<float>(g.anchor);
+
+      lfo.Init(sr);
+      lfo.SetFreq(freq);
+    }
+
+    float read(const Granulator& g) {
+
+      time = (time + 1) % g.grain_length;
+      if (0 == time) {
+        read_h = static_cast<float>(g.anchor);
+      } else {
+        read_h += 1.f;
+      }
+      read_h = fmod(read_h + g.depth * lfo.Process(), buffer_length);
+      return window_buffer[time] * ::read(read_h);
+    }
+  };
+
+  Grain ga, gb;
+  size_t anchor, grain_length;
   float depth;
 
-  void Init(float sr, float freq, float delay, float grain, float phase = 0.f) {
+  void Init(float sr, float freq, float delay, float grain) {
 
     anchor = buffer_length - (delay * 0.001f * sr);
     grain_length = grain * 0.001f * sr;
-    time += grain_length * phase;
-    read_h = static_cast<float>(anchor);
 
     depth = 0.f;
 
-    lfo.Init(sr);
-    lfo.SetFreq(freq);
+    ga.Init(sr, freq, 0.f, *this);
+    gb.Init(sr, freq, 0.5f, *this);
   }
 
   void setDepth(float d) {
@@ -49,34 +77,66 @@ struct Granulator {
   }
 
   float read() {
-
-    time = (time + 1) % grain_length;
-    if (0 == time) {
-      read_h = static_cast<float>(anchor);
-    } else {
-      read_h += 1.f;
-    }
-    read_h = fmod(read_h + depth * lfo.Process(), buffer_length);
     anchor = (anchor + 1) & buffer_length_mod;
-    return window_buffer[time] * ::read(read_h);
+    return ga.read(*this) + gb.read(*this);
   }
 };
 
-Granulator ga, gb;
+template<int Size>
+struct Cloud {
+  Granulator gs[Size];
 
-void AudioCallback(float** in, float** out, size_t size) {
-  for (size_t i = 0; i < size; i++) {
+  void Init(
+    float sr, float grain,
+    float* fs,
+    float* ds) {
+    for (size_t i = 0; i < Size; ++i) {
+      gs[i].Init(sr, fs[i], ds[i], grain);
+    }
+  }
 
-    float wet = ga.read() + gb.read();
-    float dry = in[0][i];
-    float dw = 0.6f;
+  void setDepths(float* depths) {
+    for (size_t i = 0; i < Size; ++i) {
+      gs[i].setDepth(depths[i]);
+    }
+  }
+
+  float read() {
+    float sample = 0.0f;
+    for (size_t i = 0; i < Size; ++i) {
+      sample += gs[i].read();
+    }
+    return sample / float(Size);
+  }
+};
+
+Cloud<2> cloud;
+
+void channel_0_callback(float* in, float* out, size_t nsamples) {
+
+  for (size_t i = 0; i < nsamples; ++i) {
+
+    float wet = cloud.read();
+    float dry = in[i];
+    float dw = 0.5f;
     float sample = (1.f - dw) * dry + dw * wet;
 
     write(dry);
 
-    out[0][i] = sample;
-    out[1][i] = in[1][i];
+    out[i] = sample;
   }
+}
+
+void channel_1_callback(float* in, float* out, size_t nsamples) {
+
+  for (size_t i = 0; i < nsamples; i++) {
+    out[i] = in[i];
+  }
+}
+
+void AudioCallback(float** in, float** out, size_t size) {
+  channel_0_callback(in[0], out[0], size);
+  channel_1_callback(in[1], out[1], size);
 }
 
 int main(void) {
@@ -86,27 +146,33 @@ int main(void) {
   hw.Configure();
   hw.Init();
 
-  ga.Init(hw.AudioSampleRate(), 500.f, 17.f, 100.f, 0.f);
-  gb.Init(hw.AudioSampleRate(), 500.f, 17.f, 100.f, 0.5f);
-
-  ga.setDepth(0.02f);
-  gb.setDepth(0.02f);
+  {
+    float freqs[] = { 25.f, 10.f };
+    float delays[] = { 17.f, 10.f };
+    float depths[] = { 0.015f, 0.021f };
+    cloud.Init(hw.AudioSampleRate(), 100.f, freqs, delays);
+    cloud.setDepths(depths);
+  }
 
   write_h = 0;
 
-  window_buffer = new float[ga.grain_length];
-  float N_2 = ga.grain_length / 2.f;
-  for (size_t i = 0; i < ga.grain_length; ++i) {
+  size_t N = cloud.gs[0].grain_length;
+  window_buffer = new float[N];
+  for (size_t i = 0; i < N; ++i) {
     // float w = 1.f - abs((i - N_2) / N_2);
-    float w = sin((M_PI * i) / (float)(ga.grain_length));
+    float w = sin((M_PI * i) / (float)(N));
     window_buffer[i] = w;
   }
 
   hw.StartAudio(AudioCallback);
 
+  daisy::UartHandler uart1;
+  uart1.Init();
+  uint8_t buff = 'a';
+
   while (1) {
+    state = HAL_OK == uart1.PollTx(&buff, 1);
     hw.SetLed(state);
-    state = !state;
     daisy::System::Delay(1000);
   }
 }
