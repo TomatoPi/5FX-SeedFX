@@ -50,13 +50,6 @@ int main(void)
     chorus.dry = -3db;
     chorus.wet = -3db;
     chorus.feedback = 0.f;
-
-    size_t N = chorus.granulators[0].grain_length;
-    for (size_t i = 0; i < N; ++i) {
-      // float w = 1.f - abs((i - N_2) / N_2);
-      float w = sin((M_PI * i) / (float)(N));
-      chorus.window[i] = w;
-    }
   }
 
   hw.StartAudio(AudioCallback);

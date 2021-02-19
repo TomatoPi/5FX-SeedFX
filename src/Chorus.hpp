@@ -46,15 +46,12 @@ namespace sfx
         void Init(float sr, float freq, float phase, const Granulator& g);
         float Read(
           const Granulator& g,
-          const float* window,
           const Buffer& buffer);
       };
 
       void Init(float sr, float freq, float delay, float grain, size_t bufferlength);
       void SetDepth(float d);
-      float Read(
-        const float* window,
-        const Buffer& buffer);
+      float Read(const Buffer& buffer);
 
       Grain ga, gb;
       size_t anchor, grain_length;
@@ -63,7 +60,6 @@ namespace sfx
 
     Granulator granulators[CloudSizeMax];
     Buffer buffer;
-    float* window;
     size_t size;
 
     float dry;
@@ -104,11 +100,10 @@ namespace sfx
   template <size_t CloudSizeMax, typename LFO>
   float ChorusEngine<CloudSizeMax, LFO>::Granulator::Grain::Read(
     const Granulator& g,
-    const float* window,
     const Buffer& buffer)
   {
-
-    float sample = window[time] * buffer.Read(read_h);
+    float window = sin((M_PI * time) / (float)(g.grain_length));
+    float sample = window * buffer.Read(read_h);
     time = (time + 1) % g.grain_length;
     if (0 == time) {
       read_h = static_cast<float>(g.anchor);
@@ -142,11 +137,9 @@ namespace sfx
   }
 
   template <size_t CloudSizeMax, typename LFO>
-  float ChorusEngine<CloudSizeMax, LFO>::Granulator::Read(
-    const float* window,
-    const Buffer& buffer)
+  float ChorusEngine<CloudSizeMax, LFO>::Granulator::Read(const Buffer& buffer)
   {
-    float sample = ga.Read(*this, window, buffer) + gb.Read(*this, window, buffer);
+    float sample = ga.Read(*this, buffer) + gb.Read(*this, buffer);
     anchor = (anchor + 1) & buffer.lengthmod;
     return sample;
   }
@@ -165,7 +158,6 @@ namespace sfx
     for (size_t i = 0; i < size; ++i) {
       granulators[i].Init(sr, fs[i], ds[i], grain, buffer.length);
     }
-    window = new float[granulators[0].grain_length];
   }
 
   template <size_t CloudSizeMax, typename LFO>
@@ -181,7 +173,7 @@ namespace sfx
   {
     float sample = 0.0f;
     for (size_t i = 0; i < size; ++i) {
-      sample += granulators[i].Read(window, buffer);
+      sample += granulators[i].Read(buffer);
     }
     return sample / float(size);
   }
