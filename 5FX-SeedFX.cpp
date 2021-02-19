@@ -1,5 +1,5 @@
-#include "src/Chorus.hpp"
 #include "src/Utils.hpp"
+#include "src/Chorus.hpp"
 #include "src/Looper.hpp"
 
 #include <daisy_seed.h>
@@ -8,20 +8,16 @@
 #include <Utility/smooth_random.h>
 
 daisy::DaisySeed hw;
-sfx::ChorusEngine<1L << 16, 8, daisysp::SmoothRandomGenerator> chorus;
-sfx::LooperEngine<1L << 1> looper;
 
-constexpr size_t N = 1L << 16;
-float DSY_SDRAM_BSS buffer[N];
-size_t pos = 0;
+sfx::LooperEngine<1L << 1> looper;
 
 void channel_0_callback(float* in, float* out, size_t nsamples)
 {
   for (size_t i = 0; i < nsamples; ++i) {
-    buffer[pos] = in[i];
-    pos = (pos + 1) & (N - 1);
-    out[i] = buffer[pos];
-    // out[i] = chorus.Process(in[i]);
+    // buffer.Write(in[i]);
+    // out[i] = buffer.Read(pos);
+    // pos = (pos + 1) & (N - 1);
+    out[i] = sfx::Chorus::Process(in[i]);
   }
 }
 
@@ -46,18 +42,7 @@ int main(void)
   hw.Configure();
   hw.Init();
 
-  {
-    float freqs[] = { 25.f, 10.f };
-    float delays[] = { 17.f, 10.f };
-    float depths[] = { 0.015f, 0.021f };
-
-    chorus.Init(hw.AudioSampleRate(), 100.f, freqs, delays, 2);
-    chorus.SetDepths(depths);
-
-    chorus.dry = -3db;
-    chorus.wet = -3db;
-    chorus.feedback = 0.f;
-  }
+  sfx::Chorus::Init(hw.AudioSampleRate());
 
   {
     looper.Init(hw.AudioSampleRate(), 1.f);
