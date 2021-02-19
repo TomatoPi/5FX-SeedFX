@@ -48,3 +48,16 @@ namespace sfx
     float Playback();
   };
 }
+
+///////////////////////////////////////////////////////////////////////
+
+namespace sfx
+{
+  void LooperEngine::Init(float sr, float maxrec)
+  {
+    buffer.Init(maxrec * sr);
+    play_h = rec_length = 0;
+    dry = wet = 1.f;
+    recording = playing = false;
+  }
+}

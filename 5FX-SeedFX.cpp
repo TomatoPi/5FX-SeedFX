@@ -9,6 +9,7 @@
 
 daisy::DaisySeed hw;
 sfx::ChorusEngine<8, daisysp::SmoothRandomGenerator> chorus;
+sfx::LooperEngine looper;
 
 void channel_0_callback(float* in, float* out, size_t nsamples)
 {
