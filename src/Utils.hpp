@@ -25,12 +25,15 @@
 #pragma once
 #include <cmath>
 #include <dev/sdram.h>
+#include <cstring>
 
 namespace sfx
 {
   template <size_t Size>
   struct Buffer
   {
+    static_assert(Size && !(Size& (Size - 1)), "Size must be a power of two");
+
     float buffer[Size];
     size_t write_h;
 
@@ -75,6 +78,7 @@ namespace sfx
   void Buffer<Size>::Init()
   {
     write_h = 0;
+    memset(buffer, 0, Size * sizeof(float));
   }
   template <size_t Size>
   void Buffer<Size>::Write(float x)

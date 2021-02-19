@@ -30,7 +30,7 @@
 
 #include <cmath>
 #include <stddef.h>
-#include <type_traits>
+#include <cstring>
 
 namespace sfx
 {
@@ -103,6 +103,7 @@ namespace sfx
     {
       _buffer.Init();
       _grain_length = grain_size_ms * 0.001f * sr;
+      memset(_window, 0, GrainMaxSize * sizeof(float));
 
       for (size_t i = 0; i < cloud_size; ++i) {
         _lfos[i].Init(sr);
