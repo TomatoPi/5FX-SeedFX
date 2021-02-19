@@ -46,7 +46,6 @@ int main(void)
 
   hw.StartAudio(AudioCallback);
 
-
   while (1) {
     state = !state;
     hw.SetLed(state);

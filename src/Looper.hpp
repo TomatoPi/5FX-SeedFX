@@ -29,11 +29,10 @@ namespace sfx
 {
   namespace Looper
   {
-    // constexpr const size_t BufferSize = sfx::uppow2(sfx::ms2sample(30'000.f, 48'000.f));
-    constexpr const size_t BufferSize = 1L;
+    constexpr const size_t BufferSize = sfx::uppow2(sfx::ms2sample(30'000.f, 48'000.f));
 
-    float dry_gain = 0dB;
-    float wet_gain = -3dB;
+    float monitor_gain = 0dB;
+    float playback_gain = -3dB;
 
     sfx::Buffer<BufferSize> DSY_SDRAM_BSS _buffer;
     size_t _play_h, _rec_length;
@@ -49,8 +48,6 @@ namespace sfx
     void StopPlayback();
 
     float Process(float x);
-    void Record(float x);
-    float Playback();
   };
 }
 
@@ -62,6 +59,23 @@ namespace sfx
 {
   namespace Looper
   {
+    namespace details
+    {
+      void Record(float x)
+      {
+        _buffer.Write(x);
+        _rec_length += 1;
+        if (BufferSize <= _rec_length) {
+          StopRecord();
+        }
+      }
+      float Playback()
+      {
+        float sample = _buffer.Read(_play_h);
+        _play_h = (_play_h + 1) % _rec_length;
+        return sample;
+      }
+    }
     void Init(float sr)
     {
       _buffer.Init();
@@ -94,26 +108,12 @@ namespace sfx
     {
       float sample = 0.f;
       if (_recording) {
-        Record(x);
+        details::Record(x);
       }
       if (_playing) {
-        sample += wet_gain * Playback();
+        sample += playback_gain * details::Playback();
       }
-      return sample + dry_gain * x;
-    }
-    void Record(float x)
-    {
-      _buffer.Write(x);
-      _rec_length += 1;
-      if (BufferSize <= _rec_length) {
-        StopRecord();
-      }
-    }
-    float Playback()
-    {
-      float sample = _buffer.Read(_play_h);
-      _play_h = (_play_h + 1) % _rec_length;
-      return sample;
+      return sample + monitor_gain * x;
     }
   }
 }
