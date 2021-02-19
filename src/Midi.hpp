@@ -55,8 +55,11 @@ namespace sfx
       SystemReset = 0xFF,
     };
 
+    // \brief Convert given status byte to a Status
+    constexpr Status asStatus(uint8_t byte);
+
     /// \brief Return message length for given type
-    constexpr uint8_t length(Status status);
+    constexpr uint8_t lengthof(Status status);
 
     /// \brief Return true if given status byte correspond to a realtime message
     constexpr bool isRealtime(Status status);
@@ -69,16 +72,24 @@ namespace sfx
     {
       uint8_t status;
       uint8_t channel;
-      uint8_t datas[2];
+      uint8_t d1;
+      uint8_t d2;
+    };
+    struct RawEvent
+    {
+      uint8_t buffer[3];
+      uint8_t length;
+      explicit RawEvent(const Event& e);
     };
 
     template <uint8_t RawBufferSize, uint8_t EventBufferSize>
     struct Parser
     {
-      uint8_t rawbuffer[RawBufferSize];
       daisy::RingBuffer<Event, EventBufferSize> events;
+      uint8_t rawbuffer[RawBufferSize];
       uint8_t cur_length, expected_length;
 
+      void Init();
       void Parse(uint8_t byte);
       Event NextEvent();
       bool HasNext();
@@ -94,31 +105,51 @@ namespace sfx
 {
   namespace midi
   {
+    RawEvent::RawEvent(const Event& e) :
+      buffer{ 0,0,0 }, length(midi::lengthof(asStatus(e.status)))
+    {
+      buffer[0] = e.status | e.channel;
+      if (1 < length) buffer[1] = e.d1;
+      if (2 < length) buffer[2] = e.d2;
+    }
+
+    template<uint8_t Rs, uint8_t Es>
+    void Parser<Rs, Es>::Init()
+    {
+      events.Init();
+      memset(rawbuffer, 0, Rs);
+      cur_length = expected_length = 0;
+    }
     template<uint8_t Rs, uint8_t Es>
     void Parser<Rs, Es>::Parse(uint8_t byte)
     {
       if (0x80 & byte) { // is status
-        Status status = static_cast<Status>(byte);
+        Status status = asStatus(byte & 0xF0);
         if (isRealtime(status)) {
           Event event = { byte, 0 };
           events.Write(event);
-        } else if (0 == cur_length) {
-          expected_length = length(status);
-        } else {
+          return;
+        }
+        if (0 < cur_length) {
           /// TODO : Signal that messages are smashed
         }
+        expected_length = lengthof(status);
+        cur_length = 0;
       }
+
       if (Rs <= cur_length) {
         cur_length = expected_length = 0;
-        return; /// TODO : Signal that we have droped a message
+        /// TODO : Signal that we have droped a message
+        return;
       }
+
       rawbuffer[cur_length] = byte;
       cur_length += 1;
       if (cur_length == expected_length) {
-        auto [type, channel] = split(static_cast<Status>(rawbuffer[0]));
+        auto pair = split(asStatus(rawbuffer[0]));
         uint8_t d1 = 1 < expected_length ? rawbuffer[1] : 0;
         uint8_t d2 = 2 < expected_length ? rawbuffer[2] : 0;
-        Event event = { type, channel, d1, d2 };
+        Event event = { pair.first, pair.second, d1, d2 };
         events.Write(event);
         cur_length = 0;
       }
@@ -134,7 +165,13 @@ namespace sfx
       return 0 < events.readable();
     }
 
-    constexpr uint8_t length(Status status)
+    constexpr Status asStatus(uint8_t byte)
+    {
+      if (byte < 0xF0)
+        byte = byte & 0xF0;
+      return static_cast<Status>(byte);
+    }
+    constexpr uint8_t lengthof(Status status)
     {
       switch (status & 0xF0) {
       case 0xF0:

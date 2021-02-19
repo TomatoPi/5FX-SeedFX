@@ -1,6 +1,7 @@
 #include "src/Utils.hpp"
 #include "src/Chorus.hpp"
 #include "src/Looper.hpp"
+#include "src/Midi.hpp"
 
 #include <daisy_seed.h>
 #include <per/uart.h>
@@ -8,7 +9,11 @@
 #include <Utility/smooth_random.h>
 #include <Noise/clockednoise.h>
 
-daisy::DaisySeed hw;
+static constexpr const bool CONFIRM_MIDI_RECEIVE = false;
+static constexpr const uint32_t MAIN_LOOP_FRAMETIME = 1;
+
+static daisy::DaisySeed hw;
+static sfx::midi::Parser<64, 16> midi_parser;
 
 void channel_0_callback(float* in, float* out, size_t nsamples)
 {
@@ -40,6 +45,9 @@ int main(void)
 
   daisy::UartHandler uart1;
   uart1.Init();
+  uart1.StartRx();
+
+  midi_parser.Init();
 
   sfx::Chorus::Init(hw.AudioSampleRate());
   sfx::Looper::Init(hw.AudioSampleRate());
@@ -47,8 +55,24 @@ int main(void)
   hw.StartAudio(AudioCallback);
 
   while (1) {
+    if (!uart1.RxActive()) {
+      uart1.FlushRx();
+      uart1.StartRx();
+      midi_parser.cur_length = 0;
+    }
+    while (uart1.Readable()) {
+      midi_parser.Parse(uart1.PopRx());
+    }
+    if (CONFIRM_MIDI_RECEIVE) {
+      while (midi_parser.HasNext()) {
+        sfx::midi::Event event = midi_parser.NextEvent();
+        sfx::midi::RawEvent raw(event);
+        uart1.PollTx(&raw.length, 1);
+        uart1.PollTx(raw.buffer, raw.length);
+      }
+    }
     state = !state;
     hw.SetLed(state);
-    daisy::System::Delay(1000);
+    daisy::System::Delay(MAIN_LOOP_FRAMETIME);
   }
 }
