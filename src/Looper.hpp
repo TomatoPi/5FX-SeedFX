@@ -27,9 +27,11 @@
 
 namespace sfx
 {
+  template <size_t BufferSize>
   struct LooperEngine
   {
-    sfx::Buffer buffer;
+    using Buffer = sfx::Buffer<BufferSize>;
+    Buffer buffer;
     size_t play_h, rec_length;
     float dry, wet;
     bool recording;
@@ -53,9 +55,10 @@ namespace sfx
 
 namespace sfx
 {
-  void LooperEngine::Init(float sr, float maxrec)
+  template <size_t BufferSize>
+  void LooperEngine<BufferSize>::Init(float sr, float maxrec)
   {
-    buffer.Init(1);
+    buffer.Init();
     play_h = rec_length = 0;
     dry = wet = 1.f;
     recording = playing = false;

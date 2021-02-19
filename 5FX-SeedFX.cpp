@@ -8,13 +8,20 @@
 #include <Utility/smooth_random.h>
 
 daisy::DaisySeed hw;
-sfx::ChorusEngine<8, daisysp::SmoothRandomGenerator> chorus;
-sfx::LooperEngine looper;
+sfx::ChorusEngine<1L << 16, 8, daisysp::SmoothRandomGenerator> chorus;
+sfx::LooperEngine<1L << 1> looper;
+
+constexpr size_t N = 1L << 16;
+float DSY_SDRAM_BSS buffer[N];
+size_t pos = 0;
 
 void channel_0_callback(float* in, float* out, size_t nsamples)
 {
   for (size_t i = 0; i < nsamples; ++i) {
-    out[i] = chorus.Process(in[i]);
+    buffer[pos] = in[i];
+    pos = (pos + 1) & (N - 1);
+    out[i] = buffer[pos];
+    // out[i] = chorus.Process(in[i]);
   }
 }
 
@@ -44,12 +51,16 @@ int main(void)
     float delays[] = { 17.f, 10.f };
     float depths[] = { 0.015f, 0.021f };
 
-    chorus.Init(hw.AudioSampleRate(), 100.f, freqs, delays, 100.f, 2);
+    chorus.Init(hw.AudioSampleRate(), 100.f, freqs, delays, 2);
     chorus.SetDepths(depths);
 
     chorus.dry = -3db;
     chorus.wet = -3db;
     chorus.feedback = 0.f;
+  }
+
+  {
+    looper.Init(hw.AudioSampleRate(), 1.f);
   }
 
   hw.StartAudio(AudioCallback);

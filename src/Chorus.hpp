@@ -32,9 +32,10 @@
 
 namespace sfx
 {
-  template <size_t CloudSizeMax, typename LFO>
+  template <size_t BufferSize, size_t CloudSizeMax, typename LFO>
   struct ChorusEngine
   {
+    using Buffer = sfx::Buffer<BufferSize>;
     struct Granulator
     {
       struct Grain
@@ -49,7 +50,7 @@ namespace sfx
           const Buffer& buffer);
       };
 
-      void Init(float sr, float freq, float delay, float grain, size_t bufferlength);
+      void Init(float sr, float freq, float delay, float grain);
       void SetDepth(float d);
       float Read(const Buffer& buffer);
 
@@ -69,7 +70,6 @@ namespace sfx
     void Init(
       float sr, float grain,
       float* fs, float* ds,
-      float maxlength,
       size_t size);
     void SetDepths(float* depths);
     float Read();
@@ -86,8 +86,8 @@ namespace sfx
 
   /* Grain */
 
-  template <size_t CloudSizeMax, typename LFO>
-  void ChorusEngine<CloudSizeMax, LFO>::Granulator::Grain::Init(float sr, float freq, float phase, const Granulator& g)
+  template <size_t BufferSize, size_t CloudSizeMax, typename LFO>
+  void ChorusEngine<BufferSize, CloudSizeMax, LFO>::Granulator::Grain::Init(float sr, float freq, float phase, const Granulator& g)
   {
 
     time += g.grain_length * phase;
@@ -97,8 +97,8 @@ namespace sfx
     lfo.SetFreq(freq);
   }
 
-  template <size_t CloudSizeMax, typename LFO>
-  float ChorusEngine<CloudSizeMax, LFO>::Granulator::Grain::Read(
+  template <size_t BufferSize, size_t CloudSizeMax, typename LFO>
+  float ChorusEngine<BufferSize, CloudSizeMax, LFO>::Granulator::Grain::Read(
     const Granulator& g,
     const Buffer& buffer)
   {
@@ -110,18 +110,18 @@ namespace sfx
     } else {
       read_h += 1.f;
     }
-    read_h = fmod(read_h + g.depth * lfo.Process(), buffer.length);
+    read_h = fmod(read_h + g.depth * lfo.Process(), BufferSize);
     return sample;
   }
 
   /* Granulator */
 
-  template <size_t CloudSizeMax, typename LFO>
-  void ChorusEngine<CloudSizeMax, LFO>::Granulator::Init(
-    float sr, float freq, float delay, float grain, size_t bufferlength)
+  template <size_t BufferSize, size_t CloudSizeMax, typename LFO>
+  void ChorusEngine<BufferSize, CloudSizeMax, LFO>::Granulator::Init(
+    float sr, float freq, float delay, float grain)
   {
 
-    anchor = bufferlength - (delay * 0.001f * sr);
+    anchor = BufferSize - (delay * 0.001f * sr);
     grain_length = grain * 0.001f * sr;
 
     depth = 0.f;
@@ -130,46 +130,45 @@ namespace sfx
     gb.Init(sr, freq, 0.5f, *this);
   }
 
-  template <size_t CloudSizeMax, typename LFO>
-  void ChorusEngine<CloudSizeMax, LFO>::Granulator::SetDepth(float d)
+  template <size_t BufferSize, size_t CloudSizeMax, typename LFO>
+  void ChorusEngine<BufferSize, CloudSizeMax, LFO>::Granulator::SetDepth(float d)
   {
     depth = d;
   }
 
-  template <size_t CloudSizeMax, typename LFO>
-  float ChorusEngine<CloudSizeMax, LFO>::Granulator::Read(const Buffer& buffer)
+  template <size_t BufferSize, size_t CloudSizeMax, typename LFO>
+  float ChorusEngine<BufferSize, CloudSizeMax, LFO>::Granulator::Read(const Buffer& buffer)
   {
     float sample = ga.Read(*this, buffer) + gb.Read(*this, buffer);
-    anchor = (anchor + 1) & buffer.lengthmod;
+    anchor = (anchor + 1) & (BufferSize - 1);
     return sample;
   }
 
   /* Engine */
 
-  template <size_t CloudSizeMax, typename LFO>
-  void ChorusEngine<CloudSizeMax, LFO>::Init(
+  template <size_t BufferSize, size_t CloudSizeMax, typename LFO>
+  void ChorusEngine<BufferSize, CloudSizeMax, LFO>::Init(
     float sr, float grain,
     float* fs, float* ds,
-    float maxlength,
     size_t s)
   {
     size = s;
-    buffer.Init(maxlength * 0.001f * sr);
+    buffer.Init();
     for (size_t i = 0; i < size; ++i) {
-      granulators[i].Init(sr, fs[i], ds[i], grain, buffer.length);
+      granulators[i].Init(sr, fs[i], ds[i], grain);
     }
   }
 
-  template <size_t CloudSizeMax, typename LFO>
-  void ChorusEngine<CloudSizeMax, LFO>::SetDepths(float* depths)
+  template <size_t BufferSize, size_t CloudSizeMax, typename LFO>
+  void ChorusEngine<BufferSize, CloudSizeMax, LFO>::SetDepths(float* depths)
   {
     for (size_t i = 0; i < size; ++i) {
       granulators[i].SetDepth(depths[i]);
     }
   }
 
-  template <size_t CloudSizeMax, typename LFO>
-  float ChorusEngine<CloudSizeMax, LFO>::Read()
+  template <size_t BufferSize, size_t CloudSizeMax, typename LFO>
+  float ChorusEngine<BufferSize, CloudSizeMax, LFO>::Read()
   {
     float sample = 0.0f;
     for (size_t i = 0; i < size; ++i) {
@@ -178,8 +177,8 @@ namespace sfx
     return sample / float(size);
   }
 
-  template <size_t CloudSizeMax, typename LFO>
-  float ChorusEngine<CloudSizeMax, LFO>::Process(float x)
+  template <size_t BufferSize, size_t CloudSizeMax, typename LFO>
+  float ChorusEngine<BufferSize, CloudSizeMax, LFO>::Process(float x)
   {
     float wet_sample = Read();
     float output = dry * x + wet * wet_sample;
