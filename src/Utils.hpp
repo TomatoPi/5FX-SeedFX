@@ -24,16 +24,17 @@
 
 #pragma once
 #include <cmath>
+#include <dev/sdram.h>
 
 namespace sfx
 {
+  template <size_t Size>
   struct Buffer
   {
-    float* buffer;
-    size_t length, lengthmod;
+    float buffer[Size];
     size_t write_h;
 
-    void Init(size_t size);
+    void Init();
     void Write(float x);
     float Read(float t) const;
     float Read(size_t s) const;
@@ -61,27 +62,29 @@ constexpr float operator"" dB(unsigned long long int db)
 namespace sfx
 {
   /* Buffer */
-  void Buffer::Init(size_t size)
+
+  template <size_t Size>
+  void Buffer<Size>::Init()
   {
-    buffer = new float[size];
-    length = size;
-    lengthmod = size - 1;
     write_h = 0;
   }
-  void Buffer::Write(float x)
+  template <size_t Size>
+  void Buffer<Size>::Write(float x)
   {
-    write_h = (write_h + 1) & lengthmod;
     buffer[write_h] = x;
+    write_h = (write_h + 1) & (Size - 1);
   }
-  float Buffer::Read(float t) const
+  template <size_t Size>
+  float Buffer<Size>::Read(float t) const
   {
     size_t ti = static_cast<size_t>(t);
     float tf = t - ti;
     float a = buffer[ti];
-    float b = buffer[(ti + 1) & lengthmod];
+    float b = buffer[(ti + 1) & (Size - 1)];
     return (1.f - tf) * a + tf * b;
   }
-  float Buffer::Read(size_t s) const
+  template <size_t Size>
+  float Buffer<Size>::Read(size_t s) const
   {
     return buffer[s];
   }

@@ -29,7 +29,7 @@ namespace sfx
 {
   struct LooperEngine
   {
-    sfx::Buffer buffer;
+    sfx::Buffer<1> buffer;
     size_t play_h, rec_length;
     float dry, wet;
     bool recording;
@@ -57,7 +57,7 @@ namespace sfx
 {
   void LooperEngine::Init(float sr, float maxrec)
   {
-    buffer.Init(maxrec * sr);
+    buffer.Init();
     play_h = rec_length = 0;
     dry = wet = 1.f;
     recording = playing = false;
@@ -99,7 +99,7 @@ namespace sfx
   {
     buffer.Write(x);
     rec_length += 1;
-    if (buffer.length <= rec_length) {
+    if (1 <= rec_length) {
       StopRecord();
     }
   }

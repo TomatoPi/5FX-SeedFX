@@ -1,7 +1,6 @@
-#include "src/Chorus.hpp"
 #include "src/Utils.hpp"
+#include "src/Chorus.hpp"
 #include "src/Looper.hpp"
-// #include "src/Midi.hpp"
 
 #include <daisy_seed.h>
 #include <per/uart.h>
@@ -10,14 +9,13 @@
 #include <Noise/clockednoise.h>
 
 daisy::DaisySeed hw;
-sfx::ChorusEngine<8, daisysp::SmoothRandomGenerator> chorus;
+
 sfx::LooperEngine looper;
 
 void channel_0_callback(float* in, float* out, size_t nsamples)
 {
   for (size_t i = 0; i < nsamples; ++i) {
-    float sample = chorus.Process(in[i]);
-    out[i] = looper.Process(sample);
+    out[i] = sfx::Chorus::Process(in[i]);
   }
 }
 
@@ -42,14 +40,11 @@ int main(void)
   hw.Configure();
   hw.Init();
 
-  float freqs[] = { 25.f, 10.f };
-  float delays[] = { 17.f, 10.f };
-  float depths[] = { 0.015f, 0.021f };
+  sfx::Chorus::Init(hw.AudioSampleRate());
 
-  chorus.Init(hw.AudioSampleRate(), 100.f, freqs, delays, 1 << 16, 2);
-  chorus.SetDepths(depths);
-
-  looper.Init(hw.AudioSampleRate(), 10.f);
+  {
+    looper.Init(hw.AudioSampleRate(), 1.f);
+  }
 
   hw.StartAudio(AudioCallback);
 
