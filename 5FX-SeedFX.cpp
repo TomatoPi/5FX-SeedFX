@@ -1,6 +1,6 @@
 #include "src/Utils.hpp"
 #include "src/Chorus.hpp"
-#include "src/Looper.hpp"
+// #include "src/Looper.hpp"
 
 #include <daisy_seed.h>
 #include <per/uart.h>
@@ -9,8 +9,6 @@
 #include <Noise/clockednoise.h>
 
 daisy::DaisySeed hw;
-
-sfx::LooperEngine looper;
 
 void channel_0_callback(float* in, float* out, size_t nsamples)
 {
@@ -41,10 +39,7 @@ int main(void)
   hw.Init();
 
   sfx::Chorus::Init(hw.AudioSampleRate());
-
-  {
-    looper.Init(hw.AudioSampleRate(), 1.f);
-  }
+  // sfx::Looper::Init(hw.AudioSampleRate());
 
   hw.StartAudio(AudioCallback);
 

@@ -44,6 +44,14 @@ namespace sfx
   {
     return powf(10.f, db / 10.f);
   }
+  constexpr inline size_t ms2sample(float ms, float sr)
+  {
+    return ms * 0.001f * sr;
+  }
+  constexpr inline size_t uppow2(size_t n)
+  {
+    return 1 < n ? uppow2(n >> 1) << 1 : 1;
+  }
 }
 
 constexpr float operator"" dB(long double db)

@@ -27,15 +27,20 @@
 
 namespace sfx
 {
-  struct LooperEngine
+  namespace Looper
   {
-    sfx::Buffer<1> buffer;
-    size_t play_h, rec_length;
-    float dry, wet;
-    bool recording;
-    bool playing;
+    // constexpr const size_t BufferSize = sfx::uppow2(sfx::ms2sample(30'000.f, 48'000.f));
+    constexpr const size_t BufferSize = 1L;
 
-    void Init(float sr, float maxrec);
+    float dry_gain = 0dB;
+    float wet_gain = -3dB;
+
+    sfx::Buffer<BufferSize> DSY_SDRAM_BSS _buffer;
+    size_t _play_h, _rec_length;
+    bool _recording;
+    bool _playing;
+
+    void Init(float sr);
 
     void StartRecord();
     void StopRecord();
@@ -55,58 +60,60 @@ namespace sfx
 
 namespace sfx
 {
-  void LooperEngine::Init(float sr, float maxrec)
+  namespace Looper
   {
-    buffer.Init();
-    play_h = rec_length = 0;
-    dry = wet = 1.f;
-    recording = playing = false;
-  }
-
-  void LooperEngine::StartRecord()
-  {
-    recording = true;
-    buffer.write_h = 0;
-    rec_length = 0;
-  }
-  void LooperEngine::StopRecord()
-  {
-    recording = false;
-  }
-
-  void LooperEngine::StartPlayback()
-  {
-    playing = true;
-    play_h = 0;
-  }
-  void LooperEngine::StopPlayback()
-  {
-    playing = false;
-  }
-
-  float LooperEngine::Process(float x)
-  {
-    float sample = 0.f;
-    if (recording) {
-      Record(x);
+    void Init(float sr)
+    {
+      _buffer.Init();
+      _play_h = _rec_length = 0;
+      _recording = _playing = false;
     }
-    if (playing) {
-      sample += wet * Playback();
+
+    void StartRecord()
+    {
+      _recording = true;
+      _buffer.write_h = 0;
+      _rec_length = 0;
     }
-    return sample + dry * x;
-  }
-  void LooperEngine::Record(float x)
-  {
-    buffer.Write(x);
-    rec_length += 1;
-    if (1 <= rec_length) {
-      StopRecord();
+    void StopRecord()
+    {
+      _recording = false;
     }
-  }
-  float LooperEngine::Playback()
-  {
-    float sample = buffer.Read(play_h);
-    play_h = (play_h + 1) % rec_length;
-    return sample;
+
+    void StartPlayback()
+    {
+      _playing = true;
+      _play_h = 0;
+    }
+    void StopPlayback()
+    {
+      _playing = false;
+    }
+
+    float Process(float x)
+    {
+      float sample = 0.f;
+      if (_recording) {
+        Record(x);
+      }
+      if (_playing) {
+        sample += wet_gain * Playback();
+      }
+      return sample + dry_gain * x;
+    }
+    void Record(float x)
+    {
+      _buffer.Write(x);
+      _rec_length += 1;
+      if (BufferSize <= _rec_length) {
+        StopRecord();
+      }
+    }
+    float Playback()
+    {
+      float sample = _buffer.Read(_play_h);
+      _play_h = (_play_h + 1) % _rec_length;
+      return sample;
+    }
   }
 }
