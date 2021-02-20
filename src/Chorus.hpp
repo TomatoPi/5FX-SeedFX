@@ -46,8 +46,8 @@ namespace sfx
     float frequencies[CloudMaxSize] = { 25.f, 10.f };
     float depths[CloudMaxSize] = { 0.015f, 0.021f };
     float grain_size_ms = 100.f;
-    float dry_gain = -3dB;
-    float wet_gain = -3dB;
+    float dry_gain = -6dB;
+    float wet_gain = -6dB;
     float feedback_gain = 0.f;
     size_t cloud_size = 2;
     bool bypass = false;
