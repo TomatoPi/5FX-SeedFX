@@ -9,7 +9,7 @@
 #include <Utility/smooth_random.h>
 #include <Noise/clockednoise.h>
 
-constexpr const bool DEBUG_MIDI_RECEIVE = false;
+constexpr const bool DEBUG_WITH_MIDI = true;
 constexpr const uint32_t MAIN_LOOP_FRAMETIME = 1;
 
 daisy::DaisySeed hw;
@@ -82,9 +82,40 @@ namespace callbacks
 
 void AudioCallback(float** in, float** out, size_t size)
 {
-  if (!DEBUG_MIDI_RECEIVE) callbacks::midi::events();
+  if (!DEBUG_WITH_MIDI) callbacks::midi::events();
   callbacks::audio::channel_0(in[0], out[0], size);
   callbacks::audio::channel_1(in[1], out[1], size);
+}
+
+constexpr const uint32_t QSPI_BLOCK_SIZE = 4096;
+
+constexpr const uint32_t SaveSectionSize = QSPI_BLOCK_SIZE;
+constexpr const uint32_t SaveSectionBegin = 0x9000'0000;
+constexpr const uint32_t SaveSectionEnd = SaveSectionBegin + SaveSectionSize;
+uint8_t DSY_QSPI_BSS SaveSectionBlock[SaveSectionSize];
+
+uint8_t qspi_test_values[128] = { 0 };
+
+void write_to_qspi()
+{
+  dsy_qspi_deinit();
+  hw.qspi_handle.mode = DSY_QSPI_MODE_INDIRECT_POLLING;
+  dsy_qspi_init(&hw.qspi_handle);
+
+  dsy_qspi_erase(SaveSectionBegin, SaveSectionEnd);
+  dsy_qspi_write(SaveSectionBegin, 128, qspi_test_values);
+
+  dsy_qspi_deinit();
+}
+void read_from_qspi()
+{
+  dsy_qspi_deinit();
+  hw.qspi_handle.mode = DSY_QSPI_MODE_DSY_MEMORY_MAPPED;
+  dsy_qspi_init(&hw.qspi_handle);
+
+  memcpy(qspi_test_values, SaveSectionBlock, 128);
+
+  dsy_qspi_deinit();
 }
 
 int main(void)
@@ -113,11 +144,18 @@ int main(void)
     while (uart1.Readable()) {
       midi_parser.Parse(uart1.PopRx());
     }
-    if (DEBUG_MIDI_RECEIVE) {
-      // midi_parser.events.Write(sfx::midi::Event{ 0xB0, 0x01, 0x05, 0x7A });
+    if (DEBUG_WITH_MIDI) {
       while (midi_parser.HasNext()) {
         sfx::midi::Event event = midi_parser.NextEvent();
-        uart1.PollTx(reinterpret_cast<uint8_t*>(&event), 4);
+        if (event.status == 0x80) {
+          qspi_test_values[event.d1] = event.d2;
+        } else if (event.status == 0x90) {
+          uart1.PollTx(qspi_test_values + event.d1, 1);
+        } else if (event.status == 0xA0) {
+          write_to_qspi();
+        } else if (event.status == 0xB0) {
+          read_from_qspi();
+        }
       }
     }
     while (midi_out_buffer.readable()) {
