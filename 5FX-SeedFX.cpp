@@ -9,12 +9,12 @@
 #include <Utility/smooth_random.h>
 #include <Noise/clockednoise.h>
 
-static constexpr const bool CONFIRM_MIDI_RECEIVE = false;
-static constexpr const uint32_t MAIN_LOOP_FRAMETIME = 50;
+constexpr const bool DEBUG_MIDI_RECEIVE = false;
+constexpr const uint32_t MAIN_LOOP_FRAMETIME = 1;
 
-static daisy::DaisySeed hw;
-static sfx::midi::Parser<64, 16> midi_parser;
-static daisy::RingBuffer<sfx::midi::RawEvent, 16> midi_out_buffer;
+daisy::DaisySeed hw;
+sfx::midi::Parser<64, 16> midi_parser;
+daisy::RingBuffer<sfx::midi::RawEvent, 16> midi_out_buffer;
 
 void set_pedalboard_led(uint8_t led, bool state)
 {
@@ -82,7 +82,7 @@ namespace callbacks
 
 void AudioCallback(float** in, float** out, size_t size)
 {
-  // callbacks::midi::events();
+  if (!DEBUG_MIDI_RECEIVE) callbacks::midi::events();
   callbacks::audio::channel_0(in[0], out[0], size);
   callbacks::audio::channel_1(in[1], out[1], size);
 }
@@ -104,8 +104,6 @@ int main(void)
 
   hw.StartAudio(AudioCallback);
 
-  bool state = false;
-  hw.SetLed(false);
   while (1) {
     if (!uart1.RxActive()) {
       uart1.FlushRx();
@@ -113,16 +111,13 @@ int main(void)
       midi_parser.cur_length = midi_parser.expected_length = 0;
     }
     while (uart1.Readable()) {
-      hw.SetLed(true);
       midi_parser.Parse(uart1.PopRx());
     }
-    if (CONFIRM_MIDI_RECEIVE) {
+    if (DEBUG_MIDI_RECEIVE) {
       // midi_parser.events.Write(sfx::midi::Event{ 0xB0, 0x01, 0x05, 0x7A });
       while (midi_parser.HasNext()) {
         sfx::midi::Event event = midi_parser.NextEvent();
-        sfx::midi::RawEvent raw(event);
-        uart1.PollTx(&raw.length, 1);
-        uart1.PollTx(raw.buffer, raw.length);
+        uart1.PollTx(reinterpret_cast<uint8_t*>(&event), 4);
       }
     }
     while (midi_out_buffer.readable()) {

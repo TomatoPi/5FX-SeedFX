@@ -123,15 +123,10 @@ namespace sfx
     }
     float Process(float x)
     {
-      if (bypass) {
-        _buffer.Write(x);
-        return x;
-      } else {
-        float wet_sample = details::accumulateVoices();
-        float output = dry_gain * x + wet_gain * wet_sample;
-        _buffer.Write(x + feedback_gain * wet_sample);
-        return output;
-      }
+      float wet_sample = details::accumulateVoices();
+      float output = dry_gain * x + wet_gain * wet_sample;
+      _buffer.Write(x + feedback_gain * wet_sample);
+      return bypass ? x : output;
     }
   }
 }

@@ -66,7 +66,7 @@ namespace sfx
 
     /// \brief Split Status byte into (type,channel) for channelled messages
     ///   return (status, 0) for non channeled messages
-    constexpr std::pair<uint8_t, uint8_t> split(Status status);
+    constexpr std::pair<uint8_t, uint8_t> split(uint8_t status);
 
     struct Event
     {
@@ -152,12 +152,12 @@ namespace sfx
         rawbuffer[cur_length] = byte;
         cur_length += 1;
         if (cur_length == expected_length) {
-          auto pair = split(asStatus(rawbuffer[0]));
+          auto pair = split(rawbuffer[0]);
           uint8_t d1 = 1 < expected_length ? rawbuffer[1] : 0;
           uint8_t d2 = 2 < expected_length ? rawbuffer[2] : 0;
           Event event = { pair.first, pair.second, d1, d2 };
           events.Write(event);
-          cur_length = 0;
+          cur_length = expected_length = 0;
         }
       }
     }
@@ -215,9 +215,9 @@ namespace sfx
         || Status::Continue == status
         || Status::Stop == status;
     }
-    constexpr std::pair<uint8_t, uint8_t> split(Status status)
+    constexpr std::pair<uint8_t, uint8_t> split(uint8_t status)
     {
-      if (0xF0 == (0xF0 & status)) {
+      if (0xF0 <= status) {
         return { status, 0 };
       } else {
         return { status & 0xF0, status & 0x0F };
