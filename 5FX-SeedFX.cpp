@@ -1,3 +1,6 @@
+#include "src/Global.hpp"
+#include "src/Save.hpp"
+
 #include "src/Utils.hpp"
 #include "src/Chorus.hpp"
 #include "src/Looper.hpp"
@@ -9,10 +12,11 @@
 #include <Utility/smooth_random.h>
 #include <Noise/clockednoise.h>
 
+using namespace sfx;
+
 constexpr const bool DEBUG_WITH_MIDI = true;
 constexpr const uint32_t MAIN_LOOP_FRAMETIME = 1;
 
-daisy::DaisySeed hw;
 sfx::midi::Parser<64, 16> midi_parser;
 daisy::RingBuffer<sfx::midi::RawEvent, 16> midi_out_buffer;
 
@@ -87,41 +91,10 @@ void AudioCallback(float** in, float** out, size_t size)
   callbacks::audio::channel_1(in[1], out[1], size);
 }
 
-constexpr const uint32_t QSPI_BLOCK_SIZE = 4096;
-
-constexpr const uint32_t SaveSectionSize = QSPI_BLOCK_SIZE;
-constexpr const uint32_t SaveSectionBegin = 0x9000'0000;
-constexpr const uint32_t SaveSectionEnd = SaveSectionBegin + SaveSectionSize;
-uint8_t DSY_QSPI_BSS SaveSectionBlock[SaveSectionSize];
-
-uint8_t qspi_test_values[128] = { 0 };
-
-void write_to_qspi()
-{
-  dsy_qspi_deinit();
-  hw.qspi_handle.mode = DSY_QSPI_MODE_INDIRECT_POLLING;
-  dsy_qspi_init(&hw.qspi_handle);
-
-  dsy_qspi_erase(SaveSectionBegin, SaveSectionEnd);
-  dsy_qspi_write(SaveSectionBegin, 128, qspi_test_values);
-
-  dsy_qspi_deinit();
-}
-void read_from_qspi()
-{
-  dsy_qspi_deinit();
-  hw.qspi_handle.mode = DSY_QSPI_MODE_DSY_MEMORY_MAPPED;
-  dsy_qspi_init(&hw.qspi_handle);
-
-  memcpy(qspi_test_values, SaveSectionBlock, 128);
-
-  dsy_qspi_deinit();
-}
-
 int main(void)
 {
-  hw.Configure();
-  hw.Init();
+  global::hardware.Configure();
+  global::hardware.Init();
 
   daisy::UartHandler uart1;
   uart1.Init();
@@ -130,10 +103,10 @@ int main(void)
   midi_parser.Init();
   midi_out_buffer.Init();
 
-  sfx::Chorus::Init(hw.AudioSampleRate());
-  sfx::Looper::Init(hw.AudioSampleRate());
+  Chorus::Init(global::hardware.AudioSampleRate());
+  Looper::Init(global::hardware.AudioSampleRate());
 
-  hw.StartAudio(AudioCallback);
+  global::hardware.StartAudio(AudioCallback);
 
   while (1) {
     if (!uart1.RxActive()) {
@@ -146,15 +119,15 @@ int main(void)
     }
     if (DEBUG_WITH_MIDI) {
       while (midi_parser.HasNext()) {
-        sfx::midi::Event event = midi_parser.NextEvent();
+        midi::Event event = midi_parser.NextEvent();
         if (event.status == 0x80) {
-          qspi_test_values[event.d1] = event.d2;
+          global::settings.test_values[event.d1] = event.d2;
         } else if (event.status == 0x90) {
-          uart1.PollTx(qspi_test_values + event.d1, 1);
+          uart1.PollTx(global::settings.test_values + event.d1, 1);
         } else if (event.status == 0xA0) {
-          write_to_qspi();
+          persist::SaveToQSPI();
         } else if (event.status == 0xB0) {
-          read_from_qspi();
+          persist::LoadFromQSPI();
         }
       }
     }
