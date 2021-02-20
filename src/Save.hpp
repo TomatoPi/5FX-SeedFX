@@ -32,15 +32,12 @@ namespace sfx
 {
   namespace persist
   {
-    namespace details
-    {
-      constexpr const uint32_t QSPI_BLOCK_SIZE = 4096;
+    constexpr const uint32_t QSPI_BLOCK_SIZE = 4096;
 
-      constexpr const uint32_t SaveSectionSize = QSPI_BLOCK_SIZE;
-      constexpr const uint32_t SaveSectionBegin = 0x9000'0000;
-      constexpr const uint32_t SaveSectionEnd = SaveSectionBegin + SaveSectionSize;
-      uint8_t DSY_QSPI_BSS SaveSectionBlock[SaveSectionSize];
-    }
+    constexpr const uint32_t SaveSectionSize = QSPI_BLOCK_SIZE;
+    constexpr const uint32_t SaveSectionBegin = 0x9000'0000;
+    constexpr const uint32_t SaveSectionEnd = SaveSectionBegin + SaveSectionSize;
+    uint8_t DSY_QSPI_BSS SaveSectionBlock[SaveSectionSize];
 
     void SaveToQSPI();
     void LoadFromQSPI();
@@ -57,14 +54,14 @@ namespace sfx
     void SaveToQSPI()
     {
       dsy_qspi_deinit();
-      global::hardware.qspi_handle.mode = DSY_QSPI_MODE_INDIRECT_POLLING;
-      dsy_qspi_init(&global::hardware.qspi_handle);
+      Hardware.qspi_handle.mode = DSY_QSPI_MODE_INDIRECT_POLLING;
+      dsy_qspi_init(&Hardware.qspi_handle);
 
-      dsy_qspi_erase(details::SaveSectionBegin, details::SaveSectionEnd);
+      dsy_qspi_erase(SaveSectionBegin, SaveSectionEnd);
       dsy_qspi_write(
-        details::SaveSectionBegin,
-        sizeof(global::Settings),
-        reinterpret_cast<uint8_t*>(&global::Settings));
+        SaveSectionBegin,
+        sizeof(Settings),
+        reinterpret_cast<uint8_t*>(&Settings));
 
       dsy_qspi_deinit();
     }
@@ -72,13 +69,13 @@ namespace sfx
     void LoadFromQSPI()
     {
       dsy_qspi_deinit();
-      global::hardware.qspi_handle.mode = DSY_QSPI_MODE_DSY_MEMORY_MAPPED;
-      dsy_qspi_init(&global::hardware.qspi_handle);
+      Hardware.qspi_handle.mode = DSY_QSPI_MODE_DSY_MEMORY_MAPPED;
+      dsy_qspi_init(&Hardware.qspi_handle);
 
       memcpy(
-        reinterpret_cast<void*>(&global::Settings),
-        details::SaveSectionBlock,
-        sizeof(global::Settings));
+        reinterpret_cast<void*>(&Settings),
+        SaveSectionBlock,
+        sizeof(Settings));
 
       dsy_qspi_deinit();
     }

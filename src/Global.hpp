@@ -36,29 +36,35 @@ namespace sfx
     constexpr const size_t GrainMaxSize = 1L << 15;
     constexpr const size_t CloudMaxSize = 8;
   }
-
-  namespace global
+  namespace Looper
   {
-    daisy::DaisySeed hardware;
+    /// \brief Approx 120s (at 48kHz) buffer for looper
+    constexpr const size_t BufferSize = sfx::uppow2(sfx::ms2sample(120'000.f, 48'000.f));
+  }
+
+  daisy::DaisySeed Hardware;
+  struct
+  {
     struct
     {
-      struct
-      {
-        float delays[Chorus::CloudMaxSize] = { 11.f, 17.f, 13.f, 5.f, 7.f, 19.f, 23.f, 29.f };
-        float frequencies[Chorus::CloudMaxSize] = { 25.f, 10.f };
-        float depths[Chorus::CloudMaxSize] = { 0.015f, 0.021f };
+      float delays[Chorus::CloudMaxSize] = { 11.f, 17.f, 13.f, 5.f, 7.f, 19.f, 23.f, 29.f };
+      float frequencies[Chorus::CloudMaxSize] = { 25.f, 10.f };
+      float depths[Chorus::CloudMaxSize] = { 0.015f, 0.021f };
 
-        float grain_size_ms = 100.f;
-        float dry_gain = -6dB;
-        float wet_gain = -6dB;
-        float feedback_gain = 0.f;
+      float grain_size_ms = 100.f;
+      float dry_gain = -3dB;
+      float wet_gain = -3dB;
+      float feedback_gain = 0.f;
 
-        size_t cloud_size = 2;
-        bool bypass = false;
-      } Chorus;
+      size_t cloud_size = 2;
+      bool bypass = false;
+    } Chorus;
+    struct
+    {
+      float monitor_gain = 0dB;
+      float playback_gain = -3dB;
+    } Looper;
+  } Settings;
 
-    } Settings;
-
-    bool dirty_flag;
-  }
+  bool SettingsDirtyFlag = false;
 }

@@ -23,17 +23,14 @@
  ///
 
 #pragma once
+
+#include "Global.hpp"
 #include "Utils.hpp"
 
 namespace sfx
 {
   namespace Looper
   {
-    constexpr const size_t BufferSize = sfx::uppow2(sfx::ms2sample(30'000.f, 48'000.f));
-
-    float monitor_gain = 0dB;
-    float playback_gain = -3dB;
-
     sfx::Buffer<BufferSize> DSY_SDRAM_BSS _buffer;
     size_t _play_h, _rec_length;
     bool _recording;
@@ -48,6 +45,9 @@ namespace sfx
     void StopPlayback();
 
     float Process(float x);
+
+    void setMonitorGain(float gain);
+    void setPlaybackGain(float gain);
   };
 }
 
@@ -81,6 +81,9 @@ namespace sfx
       _buffer.Init();
       _play_h = _rec_length = 0;
       _recording = _playing = false;
+
+      setMonitorGain(Settings.Looper.monitor_gain);
+      setPlaybackGain(Settings.Looper.playback_gain);
     }
 
     void StartRecord()
@@ -111,9 +114,20 @@ namespace sfx
         details::Record(x);
       }
       if (_playing) {
-        sample += playback_gain * details::Playback();
+        sample += Settings.Looper.playback_gain * details::Playback();
       }
-      return sample + monitor_gain * x;
+      return sample + Settings.Looper.monitor_gain * x;
+    }
+
+    void setMonitorGain(float gain)
+    {
+      Settings.Looper.monitor_gain = gain;
+      SettingsDirtyFlag = true;
+    }
+    void setPlaybackGain(float gain)
+    {
+      Settings.Looper.playback_gain = gain;
+      SettingsDirtyFlag = true;
     }
   }
 }

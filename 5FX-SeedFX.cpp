@@ -54,8 +54,8 @@ namespace callbacks
       switch (channel) {
       case 1:
         if (state) {
-          Chorus::setBypass(!global::Settings.Chorus.bypass);
-          set_pedalboard_led(1, !global::Settings.Chorus.bypass);
+          Chorus::setBypass(!Settings.Chorus.bypass);
+          set_pedalboard_led(1, !Settings.Chorus.bypass);
         }
         break;
       }
@@ -93,8 +93,8 @@ void AudioCallback(float** in, float** out, size_t size)
 
 int main(void)
 {
-  global::hardware.Configure();
-  global::hardware.Init();
+  Hardware.Configure();
+  Hardware.Init();
 
   daisy::UartHandler uart1;
   uart1.Init();
@@ -103,10 +103,12 @@ int main(void)
   midi_parser.Init();
   midi_out_buffer.Init();
 
-  Chorus::Init();
-  Looper::Init(global::hardware.AudioSampleRate());
+  Chorus::Init(Hardware.AudioSampleRate());
+  Looper::Init(Hardware.AudioSampleRate());
 
-  global::hardware.StartAudio(AudioCallback);
+  Hardware.StartAudio(AudioCallback);
+
+  SettingsDirtyFlag = false;
 
   while (1) {
     if (!uart1.RxActive()) {
@@ -126,6 +128,10 @@ int main(void)
     while (midi_out_buffer.readable()) {
       sfx::midi::RawEvent raw = midi_out_buffer.Read();
       uart1.PollTx(raw.buffer, raw.length);
+    }
+    if (SettingsDirtyFlag) {
+      persist::SaveToQSPI();
+      SettingsDirtyFlag = false;
     }
     daisy::System::Delay(MAIN_LOOP_FRAMETIME);
   }

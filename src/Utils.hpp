@@ -57,13 +57,29 @@ namespace sfx
   }
 }
 
-constexpr float operator"" dB(long double db)
+struct decibel_gain
 {
-  return sfx::db2rms(db);
+  float value;
+  explicit constexpr decibel_gain(long double v = 0.f) : value(v) {}
+  explicit constexpr decibel_gain(unsigned long long int v = 0) : value(v) {}
+  constexpr operator float()
+  {
+    return sfx::db2rms(value);
+  }
+  constexpr decibel_gain& operator- ()
+  {
+    value = -value;
+    return *this;
+  }
+};
+
+constexpr decibel_gain operator"" dB(long double db)
+{
+  return decibel_gain(db);
 }
-constexpr float operator"" dB(unsigned long long int db)
+constexpr decibel_gain operator"" dB(unsigned long long int db)
 {
-  return sfx::db2rms(db);
+  return decibel_gain(db);
 }
 
 ////////////////////////////////////////////////////////////////////
