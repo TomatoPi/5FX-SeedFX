@@ -64,7 +64,7 @@ namespace sfx
       dsy_qspi_write(
         details::SaveSectionBegin,
         sizeof(global::Settings),
-        reinterpret_cast<uint8_t*>(&global::settings));
+        reinterpret_cast<uint8_t*>(&global::Settings));
 
       dsy_qspi_deinit();
     }
@@ -76,7 +76,7 @@ namespace sfx
       dsy_qspi_init(&global::hardware.qspi_handle);
 
       memcpy(
-        reinterpret_cast<void*>(&global::settings),
+        reinterpret_cast<void*>(&global::Settings),
         details::SaveSectionBlock,
         sizeof(global::Settings));
 

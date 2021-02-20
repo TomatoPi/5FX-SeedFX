@@ -14,7 +14,7 @@
 
 using namespace sfx;
 
-constexpr const bool DEBUG_WITH_MIDI = true;
+constexpr const bool DEBUG_WITH_MIDI = false;
 constexpr const uint32_t MAIN_LOOP_FRAMETIME = 1;
 
 sfx::midi::Parser<64, 16> midi_parser;
@@ -54,8 +54,8 @@ namespace callbacks
       switch (channel) {
       case 1:
         if (state) {
-          sfx::Chorus::bypass = !sfx::Chorus::bypass;
-          set_pedalboard_led(1, !sfx::Chorus::bypass);
+          Chorus::setBypass(!global::Settings.Chorus.bypass);
+          set_pedalboard_led(1, !global::Settings.Chorus.bypass);
         }
         break;
       }
@@ -103,7 +103,7 @@ int main(void)
   midi_parser.Init();
   midi_out_buffer.Init();
 
-  Chorus::Init(global::hardware.AudioSampleRate());
+  Chorus::Init();
   Looper::Init(global::hardware.AudioSampleRate());
 
   global::hardware.StartAudio(AudioCallback);
@@ -120,15 +120,7 @@ int main(void)
     if (DEBUG_WITH_MIDI) {
       while (midi_parser.HasNext()) {
         midi::Event event = midi_parser.NextEvent();
-        if (event.status == 0x80) {
-          global::settings.test_values[event.d1] = event.d2;
-        } else if (event.status == 0x90) {
-          uart1.PollTx(global::settings.test_values + event.d1, 1);
-        } else if (event.status == 0xA0) {
-          persist::SaveToQSPI();
-        } else if (event.status == 0xB0) {
-          persist::LoadFromQSPI();
-        }
+        // debug code here
       }
     }
     while (midi_out_buffer.readable()) {
