@@ -50,6 +50,7 @@ namespace sfx
     float wet_gain = -3dB;
     float feedback_gain = 0.f;
     size_t cloud_size = 2;
+    bool bypass = false;
 
     sfx::Buffer<BufferSize> DSY_SDRAM_BSS _buffer;
     float DSY_SDRAM_BSS _window[GrainMaxSize];
@@ -122,10 +123,15 @@ namespace sfx
     }
     float Process(float x)
     {
-      float wet_sample = details::accumulateVoices();
-      float output = dry_gain * x + wet_gain * wet_sample;
-      _buffer.Write(x + feedback_gain * wet_sample);
-      return output;
+      if (bypass) {
+        _buffer.Write(x);
+        return x;
+      } else {
+        float wet_sample = details::accumulateVoices();
+        float output = dry_gain * x + wet_gain * wet_sample;
+        _buffer.Write(x + feedback_gain * wet_sample);
+        return output;
+      }
     }
   }
 }

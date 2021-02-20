@@ -80,6 +80,7 @@ namespace sfx
       uint8_t buffer[3];
       uint8_t length;
       explicit RawEvent(const Event& e);
+      explicit RawEvent(uint8_t l = 0, uint8_t s = 0, uint8_t d1 = 0, uint8_t d2 = 0);
     };
 
     template <uint8_t RawBufferSize, uint8_t EventBufferSize>
@@ -112,6 +113,10 @@ namespace sfx
       if (1 < length) buffer[1] = e.d1;
       if (2 < length) buffer[2] = e.d2;
     }
+    RawEvent::RawEvent(uint8_t l, uint8_t s, uint8_t d1, uint8_t d2) :
+      buffer{ s,d1,d2 }, length(l)
+    {
+    }
 
     template<uint8_t Rs, uint8_t Es>
     void Parser<Rs, Es>::Init()
@@ -143,15 +148,17 @@ namespace sfx
         return;
       }
 
-      rawbuffer[cur_length] = byte;
-      cur_length += 1;
-      if (cur_length == expected_length) {
-        auto pair = split(asStatus(rawbuffer[0]));
-        uint8_t d1 = 1 < expected_length ? rawbuffer[1] : 0;
-        uint8_t d2 = 2 < expected_length ? rawbuffer[2] : 0;
-        Event event = { pair.first, pair.second, d1, d2 };
-        events.Write(event);
-        cur_length = 0;
+      if (0 < expected_length) {
+        rawbuffer[cur_length] = byte;
+        cur_length += 1;
+        if (cur_length == expected_length) {
+          auto pair = split(asStatus(rawbuffer[0]));
+          uint8_t d1 = 1 < expected_length ? rawbuffer[1] : 0;
+          uint8_t d2 = 2 < expected_length ? rawbuffer[2] : 0;
+          Event event = { pair.first, pair.second, d1, d2 };
+          events.Write(event);
+          cur_length = 0;
+        }
       }
     }
     template<uint8_t Rs, uint8_t Es>
