@@ -4,6 +4,7 @@
 #include "src/Utils.hpp"
 #include "src/Chorus.hpp"
 #include "src/Looper.hpp"
+#include "src/Delay.hpp"
 #include "src/Midi.hpp"
 
 #include <daisy_seed.h>
@@ -34,6 +35,7 @@ namespace callbacks
     {
       for (size_t i = 0; i < nsamples; ++i) {
         float sample = sfx::Chorus::Process(in[i]);
+        sample = sfx::Delay::Process(sample);
         out[i] = sfx::Looper::Process(sample);
       }
     }
@@ -52,6 +54,13 @@ namespace callbacks
     {
       bool state = 64 <= val;
       switch (channel) {
+
+      case 0:
+        if (state) {
+          Delay::setBypass(!Settings.Delay.bypass);
+          set_pedalboard_led(0, !Settings.Delay.bypass);
+        }
+        break;
 
       case 1:
         if (state) {
@@ -134,6 +143,7 @@ int main(void)
 
   Chorus::Init(Hardware.AudioSampleRate());
   Looper::Init(Hardware.AudioSampleRate());
+  Delay::Init(Hardware.AudioSampleRate());
 
   Hardware.StartAudio(AudioCallback);
 

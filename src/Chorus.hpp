@@ -144,7 +144,7 @@ namespace sfx
     void setDelay(int i, float delay)
     {
       Settings.Chorus.delays[i] = delay;
-      _anchors[i] = BufferSize - (delay * 0.001f * _sr);
+      _anchors[i] = (_buffer.write_h + BufferSize - size_t(delay * 0.001f * _sr)) & (BufferSize - 1);
       _read_hs[2 * i + 0] = static_cast<size_t>(_anchors[i]);
       _read_hs[2 * i + 1] = static_cast<size_t>(_anchors[i]);
       SettingsDirtyFlag = true;

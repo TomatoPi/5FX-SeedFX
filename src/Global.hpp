@@ -42,6 +42,11 @@ namespace sfx
     /// \brief Approx 120s (at 48kHz) buffer for looper
     constexpr const size_t BufferSize = sfx::uppow2(sfx::ms2sample(120'000.f, 48'000.f));
   }
+  namespace Delay
+  {
+    /// \brief Approx 4s (at 48kHz) buffer for delay
+    constexpr const size_t BufferSize = sfx::uppow2(sfx::ms2sample(4'000.f, 48'000.f));
+  }
 
   daisy::DaisySeed Hardware;
   struct
@@ -66,6 +71,17 @@ namespace sfx
       float monitor_gain = 0dB;
       float playback_gain = -1dB;
     } Looper;
+
+    struct
+    {
+      float delay = 500.f;
+
+      float dry_gain = 0dB;
+      float wet_gain = -6dB;
+      float feedback_gain = -3dB;
+
+      bool bypass = false;
+    } Delay;
 
   } Settings;
 
