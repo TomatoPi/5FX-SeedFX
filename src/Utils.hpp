@@ -58,6 +58,23 @@ namespace sfx
   {
     return round * ((val / round) + (0 != (val % round)));
   }
+
+  template <typename T>
+  constexpr inline T identity(T x)
+  {
+    return x;
+  }
+  constexpr inline float sign(float x)
+  {
+    return x < 0 ? -1.f : 1.f;
+  }
+  constexpr inline float mapcc(
+    uint8_t val, float min = 0.f, float max = 1.f,
+    float (*map)(float) = identity<float>)
+  {
+    float x = (*map)(val / 127.f);
+    return sign(x) * min + x * (max - min);
+  }
 }
 
 struct decibel_gain
