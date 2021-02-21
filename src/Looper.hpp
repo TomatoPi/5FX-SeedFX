@@ -27,6 +27,8 @@
 #include "Global.hpp"
 #include "Utils.hpp"
 
+#include <dev/sdram.h>
+
 namespace sfx
 {
   namespace Looper

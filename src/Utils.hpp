@@ -24,7 +24,6 @@
 
 #pragma once
 #include <cmath>
-#include <dev/sdram.h>
 #include <cstring>
 
 namespace sfx
@@ -54,6 +53,10 @@ namespace sfx
   constexpr inline size_t uppow2(size_t n)
   {
     return 1 < n ? uppow2(n >> 1) << 1 : 1;
+  }
+  constexpr inline uint32_t roundup(uint32_t val, uint32_t round)
+  {
+    return round * ((val / round) + (0 != (val % round)));
   }
 }
 

@@ -34,7 +34,7 @@ namespace sfx
   {
     constexpr const uint32_t QSPI_BLOCK_SIZE = 4096;
 
-    constexpr const uint32_t SaveSectionSize = QSPI_BLOCK_SIZE;
+    constexpr const uint32_t SaveSectionSize = roundup(sizeof(Settings), QSPI_BLOCK_SIZE);
     constexpr const uint32_t SaveSectionBegin = 0x9000'0000;
     constexpr const uint32_t SaveSectionEnd = SaveSectionBegin + SaveSectionSize;
     uint8_t DSY_QSPI_BSS SaveSectionBlock[SaveSectionSize];

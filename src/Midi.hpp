@@ -24,9 +24,10 @@
 
 #pragma once
 
+#include <util/ringbuffer.h>
+
 #include <cstdint>
 #include <utility>
-#include <util/ringbuffer.h>
 
 namespace sfx
 {

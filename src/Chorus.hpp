@@ -27,6 +27,7 @@
 #include "Global.hpp"
 #include "Utils.hpp"
 
+#include <dev/sdram.h>
 #include <Utility/smooth_random.h>
 
 #include <cmath>
@@ -100,6 +101,14 @@ namespace sfx
       return sample / (float)Settings.Chorus.cloud_size;
     }
 
+    float Process(float x)
+    {
+      float wet_sample = accumulateVoices();
+      float output = Settings.Chorus.dry_gain * x + Settings.Chorus.wet_gain * wet_sample;
+      _buffer.Write(x + Settings.Chorus.feedback_gain * wet_sample);
+      return Settings.Chorus.bypass ? x : output;
+    }
+
     void Init(float samplerate)
     {
       _sr = samplerate;
@@ -124,13 +133,6 @@ namespace sfx
         setDelay(i, Settings.Chorus.delays[i]);
         setDepth(i, Settings.Chorus.depths[i]);
       }
-    }
-    float Process(float x)
-    {
-      float wet_sample = accumulateVoices();
-      float output = Settings.Chorus.dry_gain * x + Settings.Chorus.wet_gain * wet_sample;
-      _buffer.Write(x + Settings.Chorus.feedback_gain * wet_sample);
-      return Settings.Chorus.bypass ? x : output;
     }
 
     void setFrequency(int i, float frequency)

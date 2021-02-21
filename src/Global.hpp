@@ -25,6 +25,7 @@
 #pragma once
 
 #include "Utils.hpp"
+
 #include <daisy_seed.h>
 #include <per/uart.h>
 
@@ -59,11 +60,13 @@ namespace sfx
       size_t cloud_size = 2;
       bool bypass = false;
     } Chorus;
+
     struct
     {
       float monitor_gain = 0dB;
-      float playback_gain = -3dB;
+      float playback_gain = -1dB;
     } Looper;
+
   } Settings;
 
   bool SettingsDirtyFlag = false;

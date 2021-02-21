@@ -52,10 +52,39 @@ namespace callbacks
     {
       bool state = 64 <= val;
       switch (channel) {
+
       case 1:
         if (state) {
           Chorus::setBypass(!Settings.Chorus.bypass);
           set_pedalboard_led(1, !Settings.Chorus.bypass);
+        }
+        break;
+
+      case 7:
+        if (state) {
+          if (Looper::_recording) {
+            Looper::StopRecord();
+            Looper::StartPlayback();
+            set_pedalboard_led(7, false);
+          } else {
+            Looper::StartRecord();
+            set_pedalboard_led(7, true);
+          }
+        }
+        break;
+
+      case 14:
+        set_pedalboard_led(14, state);
+        if (state) {
+          Looper::StopPlayback();
+          Looper::StopRecord();
+        }
+        break;
+
+      case 15:
+        set_pedalboard_led(15, state);
+        if (state) {
+          Looper::StartPlayback();
         }
         break;
       }
