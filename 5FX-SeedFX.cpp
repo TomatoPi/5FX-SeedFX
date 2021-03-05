@@ -1,5 +1,6 @@
 #include "src/Global.hpp"
 #include "src/Save.hpp"
+#include "src/Pedalboard.hpp"
 
 #include "src/Utils.hpp"
 #include "src/Chorus.hpp"
@@ -21,10 +22,10 @@ constexpr const uint32_t MAIN_LOOP_FRAMETIME = 1;
 sfx::midi::Parser<64, 16> midi_parser;
 daisy::RingBuffer<sfx::midi::RawEvent, 16> midi_out_buffer;
 
-void set_pedalboard_led(uint8_t led, bool state)
+void sfx::Pedalboard::setLed(uint8_t id, bool state)
 {
   midi_out_buffer.Write(
-    sfx::midi::RawEvent(3, 0xB0 | led, 0x03, state ? 0x7F : 0x00));
+    sfx::midi::RawEvent(3, 0xB0 | id, 0x03, state ? 0x7F : 0x00));
 }
 
 namespace callbacks
@@ -50,59 +51,11 @@ namespace callbacks
 
   namespace midi
   {
-    void footswitch(uint8_t channel, uint8_t val)
-    {
-      bool state = 64 <= val;
-      switch (channel) {
-
-      case 0:
-        if (state) {
-          Delay::setBypass(!Settings.Delay.bypass);
-          set_pedalboard_led(0, !Settings.Delay.bypass);
-        }
-        break;
-
-      case 1:
-        if (state) {
-          Chorus::setBypass(!Settings.Chorus.bypass);
-          set_pedalboard_led(1, !Settings.Chorus.bypass);
-        }
-        break;
-
-      case 7:
-        if (state) {
-          if (Looper::_recording) {
-            Looper::StopRecord();
-            Looper::StartPlayback();
-            set_pedalboard_led(7, false);
-          } else {
-            Looper::StartRecord();
-            set_pedalboard_led(7, true);
-          }
-        }
-        break;
-
-      case 14:
-        set_pedalboard_led(14, state);
-        if (state) {
-          Looper::StopPlayback();
-          Looper::StopRecord();
-        }
-        break;
-
-      case 15:
-        set_pedalboard_led(15, state);
-        if (state) {
-          Looper::StartPlayback();
-        }
-        break;
-      }
-    }
     void control_change(uint8_t channel, uint8_t cc, uint8_t val)
     {
       switch (cc) {
       case 0x04:
-        footswitch(channel, val);
+        Pedalboard::UpdateSwitch(channel, 64 <= val);
         break;
       }
     }
@@ -144,6 +97,8 @@ int main(void)
   Chorus::Init(Hardware.AudioSampleRate());
   Looper::Init(Hardware.AudioSampleRate());
   Delay::Init(Hardware.AudioSampleRate());
+
+  Pedalboard::Init();
 
   Hardware.StartAudio(AudioCallback);
 
