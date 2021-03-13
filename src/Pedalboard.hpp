@@ -33,6 +33,7 @@
 #include <functional>
 #include <cstdint>
 #include <unordered_map>
+#include <array>
 
 namespace sfx
 {
@@ -50,6 +51,9 @@ namespace sfx
 
     std::unordered_map<uint8_t, SwitchCallback> _switches;
     std::unordered_map<uint8_t, LedBinding> _leds;
+    std::array<bool, SwitchCount> _states;
+
+    bool dirtyFlag = false;
 
     void setLed(uint8_t id, bool state);
     void bindSwitch(uint8_t id, const SwitchCallback& callback);
@@ -61,7 +65,7 @@ namespace sfx
       std::function<void(bool)> setbypass);
 
     void Init();
-    void Reinit();
+    void UpdateLeds();
     void UpdateSwitch(uint8_t id, bool state);
   }
 }
@@ -77,6 +81,7 @@ namespace sfx
       {
         uint8_t Delay = 0;
         uint8_t Chorus = 1;
+        uint8_t Overdub = 6;
         uint8_t Record = 7;
         uint8_t Undo = 14;
         uint8_t Redo = 15;
@@ -99,17 +104,33 @@ namespace sfx
             }
           }
         });
+      bindLed(Bindings.Overdub, [](bool) -> bool { return Looper::_overdubing; });
+      bindSwitch(Bindings.Overdub, [](uint8_t, bool state) -> void
+        {
+          if (state) {
+            if (Looper::_overdubing) {
+              Looper::StopOverdub();
+            } else {
+              Looper::StartOverdub();
+            }
+          }
+        });
 
-      bindLed(Bindings.Undo, Builtin::identity);
+      bindLed(Bindings.Undo, [](bool) -> bool { return Looper::_playing; });
       bindSwitch(Bindings.Undo, [](uint8_t, bool state) -> void
         {
           if (state) {
             Looper::StopPlayback();
+            Looper::StopOverdub();
             Looper::StopRecord();
           }
         });
 
-      bindLed(Bindings.Redo, Builtin::identity);
+      bindLed(Bindings.Redo,
+        [](bool) -> bool
+        {
+          return 0 < Looper::_rec_length && !Looper::_playing && !Looper::_overdubing;
+        });
       bindSwitch(Bindings.Redo, [](uint8_t, bool state) -> void
         {
           if (state) {
@@ -145,6 +166,7 @@ namespace sfx
     void Init()
     {
       _BindSwitches();
+      _states.fill(false);
       for (const auto& [id, callback] : _switches) {
         callback(id, false);
       }
@@ -152,14 +174,15 @@ namespace sfx
         setLed(id, binding(false));
       }
     }
-    void Reinit()
+    void UpdateLeds()
     {
       for (const auto& [id, binding] : _leds) {
-        setLed(id, binding(false));
+        setLed(id, binding(_states[id]));
       }
     }
     void UpdateSwitch(uint8_t id, bool state)
     {
+      _states[id] = state;
       if (auto itr = _switches.find(id); _switches.end() != itr) {
         auto [_, callback] = *itr;
         callback(id, state);
@@ -168,6 +191,7 @@ namespace sfx
           setLed(id, binding(state));
         }
       }
+      dirtyFlag = true;
     }
   }
 }

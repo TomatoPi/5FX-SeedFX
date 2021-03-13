@@ -36,6 +36,7 @@ namespace sfx
     sfx::Buffer<BufferSize> DSY_SDRAM_BSS _buffer;
     size_t _play_h, _rec_length;
     bool _recording;
+    bool _overdubing;
     bool _playing;
 
     float _monitor;
@@ -45,6 +46,9 @@ namespace sfx
 
     void StartRecord();
     void StopRecord();
+
+    void StartOverdub();
+    void StopOverdub();
 
     void StartPlayback();
     void StopPlayback();
@@ -74,6 +78,11 @@ namespace sfx
           StopRecord();
         }
       }
+      void Overdub(float x)
+      {
+        _buffer.buffer[_buffer.write_h] += x;
+        _buffer.write_h = (_buffer.write_h + 1) % _rec_length;
+      }
       float Playback()
       {
         float sample = _buffer.Read(_play_h);
@@ -93,6 +102,7 @@ namespace sfx
 
     void StartRecord()
     {
+      StopOverdub();
       _recording = true;
       _buffer.write_h = 0;
       _rec_length = 0;
@@ -102,9 +112,20 @@ namespace sfx
       _recording = false;
     }
 
+    void StartOverdub()
+    {
+      StopRecord();
+      _overdubing = true;
+      _buffer.write_h = 0;
+    }
+    void StopOverdub()
+    {
+      _overdubing = false;
+    }
+
     void StartPlayback()
     {
-      _playing = true;
+      _playing = 0 < _rec_length;
       _play_h = 0;
     }
     void StopPlayback()
@@ -117,6 +138,9 @@ namespace sfx
       float sample = 0.f;
       if (_recording) {
         details::Record(x);
+      }
+      if (_overdubing) {
+        details::Overdub(x);
       }
       if (_playing) {
         sample += _playback * details::Playback();

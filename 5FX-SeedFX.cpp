@@ -96,7 +96,7 @@ namespace callbacks
     {
       switch (channel) {
       case 15:
-        Pedalboard::Reinit();
+        Pedalboard::UpdateLeds();
         break;
       }
     }
@@ -162,6 +162,10 @@ int main(void)
         midi::Event event = midi_parser.NextEvent();
         // debug code here
       }
+    }
+    if (Pedalboard::dirtyFlag) {
+      Pedalboard::dirtyFlag = false;
+      Pedalboard::UpdateLeds();
     }
     while (midi_out_buffer.readable()) {
       sfx::midi::RawEvent raw = midi_out_buffer.Read();
