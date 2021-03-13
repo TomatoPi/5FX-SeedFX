@@ -38,6 +38,10 @@ namespace sfx
     float _sr;
     float _in_gain;
 
+    float _dry;
+    float _wet;
+    float _feedback;
+
     void Init(float sr);
     void Reload();
 
@@ -45,6 +49,10 @@ namespace sfx
 
     void setDelay(float ms);
     void setBypass(bool bypass);
+
+    void setDryGain(decibel_gain gain);
+    void setWetGain(decibel_gain gain);
+    void setFeedbackGain(decibel_gain gain);
   }
 }
 
@@ -66,15 +74,19 @@ namespace sfx
     {
       setDelay(Settings.Delay.delay);
       setBypass(Settings.Delay.bypass);
+
+      setDryGain(Settings.Delay.dry_gain);
+      setWetGain(Settings.Delay.wet_gain);
+      setFeedbackGain(Settings.Delay.feedback_gain);
     }
 
     float Process(float x)
     {
       float wet_sample = _buffer.Read(_play_h);
-      float feed_sample = x * _in_gain + wet_sample * Settings.Delay.feedback_gain;
+      float feed_sample = x * _in_gain + wet_sample * _feedback;
       _play_h = (_play_h + 1) & (BufferSize - 1);
       _buffer.Write(feed_sample);
-      return x * Settings.Delay.dry_gain + wet_sample * Settings.Delay.wet_gain;
+      return x * _dry + wet_sample * _wet;
     }
 
     void setDelay(float ms)
@@ -87,6 +99,25 @@ namespace sfx
     {
       Settings.Delay.bypass = bypass;
       _in_gain = bypass ? 0.f : 1.f;
+      SettingsDirtyFlag = true;
+    }
+
+    void setDryGain(decibel_gain gain)
+    {
+      _dry = gain.rms();
+      Settings.Delay.dry_gain = gain;
+      SettingsDirtyFlag = true;
+    }
+    void setWetGain(decibel_gain gain)
+    {
+      _wet = gain.rms();
+      Settings.Delay.wet_gain = gain;
+      SettingsDirtyFlag = true;
+    }
+    void setFeedbackGain(decibel_gain gain)
+    {
+      _feedback = gain.rms();
+      Settings.Delay.feedback_gain = gain;
       SettingsDirtyFlag = true;
     }
   }

@@ -51,6 +51,10 @@ namespace sfx
     size_t _grain_length;
     float _sr;
 
+    float _dry;
+    float _wet;
+    float _feedback;
+
     void Init(float samplerate);
     void Reload();
 
@@ -61,9 +65,9 @@ namespace sfx
     void setDepth(int voice, float depth);
 
     void setGrainSize(float size);
-    void setDryGain(float gain);
-    void setWetGain(float gain);
-    void setFeedbackGain(float gain);
+    void setDryGain(decibel_gain gain);
+    void setWetGain(decibel_gain gain);
+    void setFeedbackGain(decibel_gain gain);
 
     void setCloudSize(size_t size);
     void setBypass(bool bypass);
@@ -104,8 +108,8 @@ namespace sfx
     float Process(float x)
     {
       float wet_sample = accumulateVoices();
-      float output = Settings.Chorus.dry_gain * x + Settings.Chorus.wet_gain * wet_sample;
-      _buffer.Write(x + Settings.Chorus.feedback_gain * wet_sample);
+      float output = _dry * x + _wet * wet_sample;
+      _buffer.Write(x + _feedback * wet_sample);
       return Settings.Chorus.bypass ? x : output;
     }
 
@@ -168,18 +172,21 @@ namespace sfx
       }
       SettingsDirtyFlag = true;
     }
-    void setDryGain(float gain)
+    void setDryGain(decibel_gain gain)
     {
+      _dry = gain.rms();
       Settings.Chorus.dry_gain = gain;
       SettingsDirtyFlag = true;
     }
-    void setWetGain(float gain)
+    void setWetGain(decibel_gain gain)
     {
+      _wet = gain.rms();
       Settings.Chorus.wet_gain = gain;
       SettingsDirtyFlag = true;
     }
-    void setFeedbackGain(float gain)
+    void setFeedbackGain(decibel_gain gain)
     {
+      _feedback = gain.rms();
       Settings.Chorus.feedback_gain = gain;
       SettingsDirtyFlag = true;
     }

@@ -25,6 +25,7 @@
 #pragma once
 
 #include "Utils.hpp"
+#include "Decibel.hpp"
 
 #include <daisy_seed.h>
 #include <per/uart.h>
@@ -51,6 +52,11 @@ namespace sfx
   daisy::DaisySeed Hardware;
   struct
   {
+    struct {
+      decibel_gain input_gain = 0dB;
+      decibel_gain output_gain = 0dB;
+    } Channel0, Channel1;
+
     struct
     {
       float delays[Chorus::CloudMaxSize] = { 11.f, 17.f, 29.f, 5.f, 7.f, 19.f, 23.f, 13.f };
@@ -58,9 +64,9 @@ namespace sfx
       float depths[Chorus::CloudMaxSize] = { 0.010f, 0.014f, 0.02f };
 
       float grain_size_ms = 100.f;
-      float dry_gain = -0dB;
-      float wet_gain = -0dB;
-      float feedback_gain = 0.f;
+      decibel_gain dry_gain = -0dB;
+      decibel_gain wet_gain = -0dB;
+      decibel_gain feedback_gain = -100dB;
 
       size_t cloud_size = 3;
       bool bypass = false;
@@ -68,17 +74,17 @@ namespace sfx
 
     struct
     {
-      float monitor_gain = 0dB;
-      float playback_gain = -1dB;
+      decibel_gain monitor_gain = 0dB;
+      decibel_gain playback_gain = -1dB;
     } Looper;
 
     struct
     {
       float delay = 500.f;
 
-      float dry_gain = 0dB;
-      float wet_gain = -6dB;
-      float feedback_gain = -3dB;
+      decibel_gain dry_gain = 0dB;
+      decibel_gain wet_gain = -6dB;
+      decibel_gain feedback_gain = -3dB;
 
       bool bypass = false;
     } Delay;

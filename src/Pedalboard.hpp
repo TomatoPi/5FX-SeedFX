@@ -61,6 +61,7 @@ namespace sfx
       std::function<void(bool)> setbypass);
 
     void Init();
+    void Reinit();
     void UpdateSwitch(uint8_t id, bool state);
   }
 }
@@ -147,6 +148,12 @@ namespace sfx
       for (const auto& [id, callback] : _switches) {
         callback(id, false);
       }
+      for (const auto& [id, binding] : _leds) {
+        setLed(id, binding(false));
+      }
+    }
+    void Reinit()
+    {
       for (const auto& [id, binding] : _leds) {
         setLed(id, binding(false));
       }

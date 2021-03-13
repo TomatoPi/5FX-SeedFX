@@ -43,10 +43,6 @@ namespace sfx
     float Read(size_t s) const;
   };
 
-  constexpr inline float db2rms(float db)
-  {
-    return powf(10.f, db / 10.f);
-  }
   constexpr inline size_t ms2sample(float ms, float sr)
   {
     return ms * 0.001f * sr;
@@ -76,31 +72,15 @@ namespace sfx
     float x = (*map)(val / 127.f);
     return sign(x) * min + x * (max - min);
   }
-}
 
-struct decibel_gain
-{
-  float value;
-  explicit constexpr decibel_gain(long double v = 0.f) : value(v) {}
-  explicit constexpr decibel_gain(unsigned long long int v = 0) : value(v) {}
-  constexpr operator float()
-  {
-    return sfx::db2rms(value);
+  template <typename T>
+  constexpr inline T lerp(float t, const T& min, const T& max) {
+    return min + t * (max - min);
   }
-  constexpr decibel_gain& operator- ()
-  {
-    value = -value;
-    return *this;
+  template <typename T>
+  constexpr inline T powlerp(float t, float a, const T& min, const T& max) {
+    return lerp(powf(t, a), min, max);
   }
-};
-
-constexpr decibel_gain operator"" dB(long double db)
-{
-  return decibel_gain(db);
-}
-constexpr decibel_gain operator"" dB(unsigned long long int db)
-{
-  return decibel_gain(db);
 }
 
 ////////////////////////////////////////////////////////////////////

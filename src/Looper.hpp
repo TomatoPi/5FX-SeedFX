@@ -38,6 +38,9 @@ namespace sfx
     bool _recording;
     bool _playing;
 
+    float _monitor;
+    float _playback;
+
     void Init(float sr);
 
     void StartRecord();
@@ -48,8 +51,8 @@ namespace sfx
 
     float Process(float x);
 
-    void setMonitorGain(float gain);
-    void setPlaybackGain(float gain);
+    void setMonitorGain(decibel_gain gain);
+    void setPlaybackGain(decibel_gain gain);
   };
 }
 
@@ -116,18 +119,20 @@ namespace sfx
         details::Record(x);
       }
       if (_playing) {
-        sample += Settings.Looper.playback_gain * details::Playback();
+        sample += _playback * details::Playback();
       }
-      return sample + Settings.Looper.monitor_gain * x;
+      return sample + _monitor * x;
     }
 
-    void setMonitorGain(float gain)
+    void setMonitorGain(decibel_gain gain)
     {
+      _monitor = gain.rms();
       Settings.Looper.monitor_gain = gain;
       SettingsDirtyFlag = true;
     }
-    void setPlaybackGain(float gain)
+    void setPlaybackGain(decibel_gain gain)
     {
+      _playback = gain.rms();
       Settings.Looper.playback_gain = gain;
       SettingsDirtyFlag = true;
     }
