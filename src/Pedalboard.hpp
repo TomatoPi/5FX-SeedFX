@@ -57,6 +57,7 @@ namespace sfx
 
     void setLed(uint8_t id, bool state);
     void bindSwitch(uint8_t id, const SwitchCallback& callback);
+    void bindSwitchOnFall(uint8_t id, const std::function<void(void)>& callback);
     void bindLed(uint8_t id, const LedBinding& binding);
 
     void bindSwitchAsBypass(
@@ -92,56 +93,40 @@ namespace sfx
       bindSwitchAsBypass(
         Bindings.Chorus, []() -> bool { return Settings.Chorus.bypass; }, Chorus::setBypass);
 
-      bindLed(Bindings.Record, [](bool) -> bool { return Looper::_recording; });
-      bindSwitch(Bindings.Record, [](uint8_t, bool state) -> void
-        {
-          if (state) {
-            if (Looper::_recording) {
-              Looper::StopRecord();
-              Looper::StartPlayback();
-            } else {
-              Looper::StartRecord();
-            }
-          }
-        });
-      bindLed(Bindings.Overdub, [](bool) -> bool { return Looper::_overdubing; });
-      bindSwitch(Bindings.Overdub, [](uint8_t, bool state) -> void
-        {
-          if (state) {
-            if (Looper::_overdubing) {
-              Looper::StopOverdub();
-            } else {
-              Looper::StartOverdub();
-            }
-          }
-        });
+      bindLed(Bindings.Record,
+        [](bool) -> bool { return Looper::State::Recording == Looper::_status; });
+      bindSwitchOnFall(Bindings.Record, Looper::HitRecord);
 
-      bindLed(Bindings.Undo, [](bool) -> bool { return Looper::_playing; });
-      bindSwitch(Bindings.Undo, [](uint8_t, bool state) -> void
+      bindLed(Bindings.Overdub,
+        [](bool) -> bool { return Looper::State::Overdubing == Looper::_status; });
+      bindSwitchOnFall(Bindings.Overdub, Looper::HitOverdub);
+
+      bindLed(Bindings.Undo,
+        [](bool) -> bool
         {
-          if (state) {
-            Looper::StopPlayback();
-            Looper::StopOverdub();
-            Looper::StopRecord();
-          }
+          return Looper::State::Playback == Looper::_status
+            || Looper::State::Overdubed == Looper::_status;
         });
+      bindSwitchOnFall(Bindings.Undo, Looper::HitUndo);
 
       bindLed(Bindings.Redo,
         [](bool) -> bool
         {
-          return 0 < Looper::_rec_length && !Looper::_playing && !Looper::_overdubing;
+          return
+            (Looper::State::Playback == Looper::_status && 0 < Looper::_stacksize)
+            || (Looper::State::Overdubed == Looper::_status && Looper::_height < Looper::_stacksize)
+            || (Looper::State::Idle == Looper::_status && 0 < Looper::_rec_length);
         });
-      bindSwitch(Bindings.Redo, [](uint8_t, bool state) -> void
-        {
-          if (state) {
-            Looper::StartPlayback();
-          }
-        });
+      bindSwitchOnFall(Bindings.Redo, Looper::HitRedo);
     }
 
     void bindSwitch(uint8_t id, const SwitchCallback& callback)
     {
       _switches[id] = callback;
+    }
+    void bindSwitchOnFall(uint8_t id, const std::function<void(void)>& callback)
+    {
+      _switches[id] = [callback](uint8_t, bool state) -> void { if (state) callback(); };
     }
     void bindLed(uint8_t id, const LedBinding& binding)
     {
