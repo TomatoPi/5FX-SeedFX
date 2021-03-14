@@ -45,8 +45,9 @@ namespace sfx
       Recording,
       Overdubing,
       Playback,
-      Overdubed
-    } _status;
+      Overdubed,
+      Muted,
+    } _status, _muteback;
 
     float _monitor;
     float _playback;
@@ -57,6 +58,7 @@ namespace sfx
     void HitRedo();
     void HitOverdub();
     void HitRecord();
+    void HitMute();
 
     float Process(float x);
 
@@ -143,6 +145,17 @@ namespace sfx
         }
       }
 
+      void Mute()
+      {
+        _muteback = _status;
+        _status = State::Muted;
+      }
+      void Unmute()
+      {
+        _status = _muteback;
+        _muteback = State::Idle;
+      }
+
       float Idle(float x)
       {
         return _monitor * x;
@@ -170,6 +183,11 @@ namespace sfx
         _play_h = (_play_h + 1) % _rec_length;
         return sample * _playback + x * _monitor;
       }
+      float Muted(float x)
+      {
+        _play_h = (_play_h + 1) % _rec_length;
+        return x * _monitor;
+      }
       float Overdub(float x)
       {
         _buffer.buffer[(_height + 1) * _rec_length + _play_h] += x;
@@ -184,6 +202,7 @@ namespace sfx
       _height = _stacksize = 0;
       _play_h = _rec_length = 0;
       _status = State::Idle;
+      _muteback = State::Idle;
 
       setMonitorGain(Settings.Looper.monitor_gain);
       setPlaybackGain(Settings.Looper.playback_gain);
@@ -197,6 +216,7 @@ namespace sfx
       case State::Overdubing: return details::Overdub(x);
       case State::Playback: return details::Playback(x);
       case State::Overdubed: return details::Overdubed(x);
+      case State::Muted: return details::Muted(x);
       }
       return x;
     }
@@ -218,6 +238,9 @@ namespace sfx
       case State::Overdubed:
         details::Unstack();
         break;
+      case State::Muted:
+        details::Unmute();
+        break;
       }
     }
     void HitRedo()
@@ -235,6 +258,10 @@ namespace sfx
         break;
       case State::Overdubed:
         details::TryRestack();
+        break;
+      case State::Muted:
+        details::Unmute();
+        HitRedo();
         break;
       }
     }
@@ -255,6 +282,10 @@ namespace sfx
       case State::Overdubed:
         details::TryStartOverdub();
         break;
+      case State::Muted:
+        details::Unmute();
+        HitOverdub();
+        break;
       }
     }
     void HitRecord()
@@ -273,6 +304,30 @@ namespace sfx
       case State::Playback:
       case State::Overdubed:
         details::StartRecord();
+        break;
+      case State::Muted:
+        details::Unmute();
+        HitRecord();
+        break;
+      }
+    }
+    void HitMute()
+    {
+      switch (_status) {
+      case State::Idle:
+        break;
+      case State::Recording:
+        details::CancelRecord();
+        break;
+      case State::Overdubing:
+        details::CancelOverdub();
+        break;
+      case State::Playback:
+      case State::Overdubed:
+        details::Mute();
+        break;
+      case State::Muted:
+        details::Unmute();
         break;
       }
     }

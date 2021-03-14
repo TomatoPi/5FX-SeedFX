@@ -82,8 +82,11 @@ namespace sfx
       {
         uint8_t Delay = 0;
         uint8_t Chorus = 1;
+
         uint8_t Overdub = 6;
         uint8_t Record = 7;
+
+        uint8_t Mute = 13;
         uint8_t Undo = 14;
         uint8_t Redo = 15;
       } Bindings;
@@ -118,6 +121,10 @@ namespace sfx
             || (Looper::State::Idle == Looper::_status && 0 < Looper::_rec_length);
         });
       bindSwitchOnFall(Bindings.Redo, Looper::HitRedo);
+
+      bindLed(Bindings.Mute,
+        [](bool) ->bool { return Looper::State::Muted == Looper::_status; });
+      bindSwitchOnFall(Bindings.Mute, Looper::HitMute);
     }
 
     void bindSwitch(uint8_t id, const SwitchCallback& callback)
