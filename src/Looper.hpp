@@ -35,7 +35,7 @@ namespace sfx
   namespace Looper
   {
     sfx::Buffer<BufferSize> DSY_SDRAM_BSS _buffer;
-    std::array<sfx::Buffer<BufferSize>, LayersCount> DSY_SDRAM_BSS _stack;
+    size_t _max_height;
     size_t _height, _stacksize;
     size_t _play_h, _rec_length;
 
@@ -78,7 +78,7 @@ namespace sfx
       void StartRecord()
       {
         _buffer.write_h = 0;
-        for (auto& buffer : _stack) buffer.write_h = 0;
+        _max_height = 0;
         _height = _stacksize = 0;
         _play_h = _rec_length = 0;
         _status = State::Recording;
@@ -91,13 +91,17 @@ namespace sfx
       {
         _height = _stacksize = 0;
         _play_h = 0;
+        _max_height = (BufferSize / _rec_length) - 1;
         _status = State::Playback;
       }
 
-      void StartOverdub()
+      void TryStartOverdub()
       {
-        if (_height < LayersCount) {
-          _stack[_height].write_h = _play_h;
+        if (_height < _max_height) {
+          memset(
+            _buffer.buffer + _rec_length * (_height + 1),
+            0,
+            _rec_length * sizeof(_buffer.buffer[0]));
           _status = State::Overdubing;
         }
       }
@@ -107,7 +111,7 @@ namespace sfx
       }
       void EndOverdub()
       {
-        _height = std::min(_height + 1, LayersCount);
+        _height = std::min(_height + 1, _max_height);
         _stacksize = _height;
         _status = State::Overdubed;
       }
@@ -146,7 +150,6 @@ namespace sfx
       float Record(float x)
       {
         _buffer.Write(x);
-        for (auto& buffer : _stack) buffer.Write(0);
         _rec_length += 1;
         if (BufferSize <= _rec_length) {
           EndRecord();
@@ -162,22 +165,22 @@ namespace sfx
       float Overdubed(float x)
       {
         float sample = _buffer.Read(_play_h);
-        for (size_t i = 0; i < _stacksize; ++i)
-          sample += _stack[i].Read(_play_h);
+        for (size_t i = 0; i < _height; ++i)
+          sample += _buffer.Read((i + 1) * _rec_length + _play_h);
         _play_h = (_play_h + 1) % _rec_length;
         return sample * _playback + x * _monitor;
       }
       float Overdub(float x)
       {
-        _stack[_height].buffer[_play_h] += x;
+        _buffer.buffer[(_height + 1) * _rec_length + _play_h] += x;
         return Overdubed(x);
       }
     }
     void Init(float sr)
     {
       _buffer.Init();
-      for (auto& buffer : _stack) buffer.Init();
 
+      _max_height = 0;
       _height = _stacksize = 0;
       _play_h = _rec_length = 0;
       _status = State::Idle;
@@ -243,14 +246,14 @@ namespace sfx
         break;
       case State::Recording:
         details::EndRecord();
-        details::StartOverdub();
+        details::TryStartOverdub();
         break;
       case State::Overdubing:
         details::EndOverdub();
         break;
       case State::Playback:
       case State::Overdubed:
-        details::StartOverdub();
+        details::TryStartOverdub();
         break;
       }
     }

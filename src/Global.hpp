@@ -40,9 +40,8 @@ namespace sfx
   }
   namespace Looper
   {
-    /// \brief Approx 120s (at 48kHz) buffer for looper
-    constexpr const size_t BufferSize = sfx::uppow2(sfx::ms2sample(120'000.f, 48'000.f));
-    constexpr const size_t LayersCount = 2;
+    /// \brief At least 5min (at 48kHz) buffer for looper
+    constexpr const size_t BufferSize = sfx::uppow2(sfx::ms2sample(5.f * 60'000.f, 48'000.f));
   }
   namespace Delay
   {
