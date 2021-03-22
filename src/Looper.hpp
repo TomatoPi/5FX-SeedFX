@@ -34,36 +34,84 @@ namespace sfx
 {
   namespace Looper
   {
-    sfx::Buffer<BufferSize> DSY_SDRAM_BSS _buffer;
-    size_t _max_height;
-    size_t _height, _stacksize;
-    size_t _play_h, _rec_length;
+    /// \brief At least 5min (at 48kHz) buffer for looper
+    constexpr const size_t BufferSize = sfx::uppow2(sfx::ms2sample(2.f * 60'000.f, 48'000.f));
 
-    enum class State
+    struct Settings
     {
-      Idle,
-      Recording,
-      Overdubing,
-      Playback,
-      Overdubed,
-      Muted,
-    } _status, _muteback;
+      decibel_gain monitor_gain = 0dB;
+      decibel_gain playback_gain = -1dB;
+    };
 
-    float _monitor;
-    float _playback;
+    class Engine
+    {
+    public:
 
-    void Init(float sr);
+      using Buffer = sfx::Buffer<BufferSize>;
 
-    void HitUndo();
-    void HitRedo();
-    void HitOverdub();
-    void HitRecord();
-    void HitMute();
+      enum class State
+      {
+        Idle,
+        Recording,
+        Overdubing,
+        Playback,
+        Overdubed,
+        Muted,
+      };
 
-    float Process(float x);
+      void Init(float sr, Buffer* buffer, Settings* settings);
 
-    void setMonitorGain(decibel_gain gain);
-    void setPlaybackGain(decibel_gain gain);
+      void HitUndo();
+      void HitRedo();
+      void HitOverdub();
+      void HitRecord();
+      void HitMute();
+
+      float Process(float x);
+
+      void setMonitorGain(decibel_gain gain);
+      void setPlaybackGain(decibel_gain gain);
+
+      State GetState();
+
+    private:
+
+      void Unstack();
+      void TryRestack();
+
+      void StartRecord();
+      void CancelRecord();
+      void EndRecord();
+
+      void TryStartOverdub();
+      void CancelOverdub();
+      void EndOverdub();
+
+      void StopPlayback();
+      void TryReplay();
+
+      void Mute();
+      void Unmute();
+
+      float Idle(float x);
+      float Record(float x);
+      float Overdub(float x);
+
+      float Playback(float x);
+      float Overdubed(float x);
+      float Muted(float x);
+
+    public:
+
+      Buffer* _buffer;
+      Settings *_settings;
+      size_t _max_height;
+      size_t _height, _stacksize;
+      size_t _play_h, _rec_length;
+      State _status, _muteback;
+      float _monitor;
+      float _playback;
+    };
   };
 }
 
@@ -75,128 +123,135 @@ namespace sfx
 {
   namespace Looper
   {
-    namespace details
+
+    Engine::State Engine::GetState()
     {
-      void StartRecord()
-      {
-        _buffer.write_h = 0;
-        _max_height = 0;
-        _height = _stacksize = 0;
-        _play_h = _rec_length = 0;
-        _status = State::Recording;
-      }
-      void CancelRecord()
-      {
-        _status = State::Idle;
-      }
-      void EndRecord()
-      {
-        _height = _stacksize = 0;
-        _play_h = 0;
-        _max_height = (BufferSize / _rec_length) - 1;
-        _status = State::Playback;
-      }
+      return _status;
+    }
 
-      void TryStartOverdub()
-      {
-        if (_height < _max_height) {
-          memset(
-            _buffer.buffer + _rec_length * (_height + 1),
-            0,
-            _rec_length * sizeof(_buffer.buffer[0]));
-          _status = State::Overdubing;
-        }
-      }
-      void CancelOverdub()
-      {
-        _status = 0 < _height ? State::Overdubed : State::Playback;
-      }
-      void EndOverdub()
-      {
-        _height = std::min(_height + 1, _max_height);
-        _stacksize = _height;
-        _status = State::Overdubed;
-      }
+    void Engine::StartRecord()
+    {
+      _buffer->write_h = 0;
+      _max_height = 0;
+      _height = _stacksize = 0;
+      _play_h = _rec_length = 0;
+      _status = State::Recording;
+    }
+    void Engine::CancelRecord()
+    {
+      _status = State::Idle;
+    }
+    void Engine::EndRecord()
+    {
+      _height = _stacksize = 0;
+      _play_h = 0;
+      _max_height = (BufferSize / _rec_length) - 1;
+      _status = State::Playback;
+    }
 
-      void Unstack()
-      {
-        _height = _height - 1;
-        if (_height <= 0) {
-          _height = 0;
-          _status = State::Playback;
-        }
-      }
-      void StopPlayback()
-      {
-        _status = State::Idle;
-      }
-      void TryReplay()
-      {
-        if (0 < _rec_length) {
-          _play_h = 0;
-          _status = State::Playback;
-        }
-      }
-      void TryRestack()
-      {
-        if (_height < _stacksize) {
-          _height = _height + 1;
-          _status = State::Overdubed;
-        }
-      }
-
-      void Mute()
-      {
-        _muteback = _status;
-        _status = State::Muted;
-      }
-      void Unmute()
-      {
-        _status = _muteback;
-        _muteback = State::Idle;
-      }
-
-      float Idle(float x)
-      {
-        return _monitor * x;
-      }
-      float Record(float x)
-      {
-        _buffer.Write(x);
-        _rec_length += 1;
-        if (BufferSize <= _rec_length) {
-          EndRecord();
-        }
-        return _monitor * x;
-      }
-      float Playback(float x)
-      {
-        float sample = _buffer.Read(_play_h);
-        _play_h = (_play_h + 1) % _rec_length;
-        return sample * _playback + x * _monitor;
-      }
-      float Overdubed(float x)
-      {
-        float sample = _buffer.Read(_play_h);
-        for (size_t i = 0; i < _height; ++i)
-          sample += _buffer.Read((i + 1) * _rec_length + _play_h);
-        _play_h = (_play_h + 1) % _rec_length;
-        return sample * _playback + x * _monitor;
-      }
-      float Muted(float x)
-      {
-        _play_h = (_play_h + 1) % _rec_length;
-        return x * _monitor;
-      }
-      float Overdub(float x)
-      {
-        _buffer.buffer[(_height + 1) * _rec_length + _play_h] += x;
-        return Overdubed(x);
+    void Engine::TryStartOverdub()
+    {
+      if (_height < _max_height) {
+        memset(
+          _buffer->buffer + _rec_length * (_height + 1),
+          0,
+          _rec_length * sizeof(_buffer->buffer[0]));
+        _status = State::Overdubing;
       }
     }
-    void Init(float sr)
+    void Engine::CancelOverdub()
     {
-      _buffer.Init();
+      _status = 0 < _height ? State::Overdubed : State::Playback;
+    }
+    void Engine::EndOverdub()
+    {
+      _height = std::min(_height + 1, _max_height);
+      _stacksize = _height;
+      _status = State::Overdubed;
+    }
+
+    void Engine::Unstack()
+    {
+      _height = _height - 1;
+      if (_height <= 0) {
+        _height = 0;
+        _status = State::Playback;
+      }
+    }
+    void Engine::StopPlayback()
+    {
+      _status = State::Idle;
+    }
+    void Engine::TryReplay()
+    {
+      if (0 < _rec_length) {
+        _play_h = 0;
+        _status = State::Playback;
+      }
+    }
+    void Engine::TryRestack()
+    {
+      if (_height < _stacksize) {
+        _height = _height + 1;
+        _status = State::Overdubed;
+      }
+    }
+
+    void Engine::Mute()
+    {
+      _muteback = _status;
+      _status = State::Muted;
+    }
+    void Engine::Unmute()
+    {
+      _status = _muteback;
+      _muteback = State::Idle;
+    }
+
+    float Engine::Idle(float x)
+    {
+      return _monitor * x;
+    }
+    float Engine::Record(float x)
+    {
+      _buffer->Write(x);
+      _rec_length += 1;
+      if (BufferSize <= _rec_length) {
+        EndRecord();
+      }
+      return _monitor * x;
+    }
+    float Engine::Playback(float x)
+    {
+      float sample = _buffer->Read(_play_h);
+      _play_h = (_play_h + 1) % _rec_length;
+      return sample * _playback + x * _monitor;
+    }
+    float Engine::Overdubed(float x)
+    {
+      float sample = _buffer->Read(_play_h);
+      for (size_t i = 0; i < _height; ++i)
+        sample += _buffer->Read((i + 1) * _rec_length + _play_h);
+      _play_h = (_play_h + 1) % _rec_length;
+      return sample * _playback + x * _monitor;
+    }
+    float Engine::Muted(float x)
+    {
+      _play_h = (_play_h + 1) % _rec_length;
+      return x * _monitor;
+    }
+    float Engine::Overdub(float x)
+    {
+      _buffer->buffer[(_height + 1) * _rec_length + _play_h] += x;
+      return Overdubed(x);
+    }
+
+    void Engine::Init(float sr, Buffer* buffer, Settings* settings)
+    {
+      _buffer = buffer;
+      _buffer->Init();
+
+      _settings = settings;
 
       _max_height = 0;
       _height = _stacksize = 0;
@@ -204,144 +259,144 @@ namespace sfx
       _status = State::Idle;
       _muteback = State::Idle;
 
-      setMonitorGain(Settings.Looper.monitor_gain);
-      setPlaybackGain(Settings.Looper.playback_gain);
+      setMonitorGain(_settings->monitor_gain);
+      setPlaybackGain(_settings->playback_gain);
     }
 
-    float Process(float x)
+    float Engine::Process(float x)
     {
       switch (_status) {
-      case State::Idle: return details::Idle(x);
-      case State::Recording: return details::Record(x);
-      case State::Overdubing: return details::Overdub(x);
-      case State::Playback: return details::Playback(x);
-      case State::Overdubed: return details::Overdubed(x);
-      case State::Muted: return details::Muted(x);
+      case State::Idle: return Idle(x);
+      case State::Recording: return Record(x);
+      case State::Overdubing: return Overdub(x);
+      case State::Playback: return Playback(x);
+      case State::Overdubed: return Overdubed(x);
+      case State::Muted: return Muted(x);
       }
       return x;
     }
 
-    void HitUndo()
+    void Engine::HitUndo()
     {
       switch (_status) {
       case State::Idle:
         break;
       case State::Recording:
-        details::CancelRecord();
+        CancelRecord();
         break;
       case State::Overdubing:
-        details::CancelOverdub();
+        CancelOverdub();
         break;
       case State::Playback:
-        details::StopPlayback();
+        StopPlayback();
         break;
       case State::Overdubed:
-        details::Unstack();
+        Unstack();
         break;
       case State::Muted:
-        details::Unmute();
+        Unmute();
         break;
       }
     }
-    void HitRedo()
+    void Engine::HitRedo()
     {
       switch (_status) {
       case State::Idle:
-        details::TryReplay();
+        TryReplay();
         break;
       case State::Recording:
         break;
       case State::Overdubing:
         break;
       case State::Playback:
-        details::TryRestack();
+        TryRestack();
         break;
       case State::Overdubed:
-        details::TryRestack();
+        TryRestack();
         break;
       case State::Muted:
-        details::Unmute();
+        Unmute();
         HitRedo();
         break;
       }
     }
-    void HitOverdub()
+    void Engine::HitOverdub()
     {
       switch (_status) {
       case State::Idle:
-        details::StartRecord();
+        StartRecord();
         break;
       case State::Recording:
-        details::EndRecord();
-        details::TryStartOverdub();
+        EndRecord();
+        TryStartOverdub();
         break;
       case State::Overdubing:
-        details::EndOverdub();
+        EndOverdub();
         break;
       case State::Playback:
       case State::Overdubed:
-        details::TryStartOverdub();
+        TryStartOverdub();
         break;
       case State::Muted:
-        details::Unmute();
+        Unmute();
         HitOverdub();
         break;
       }
     }
-    void HitRecord()
+    void Engine::HitRecord()
     {
       switch (_status) {
       case State::Idle:
-        details::StartRecord();
+        StartRecord();
         break;
       case State::Recording:
-        details::EndRecord();
+        EndRecord();
         break;
       case State::Overdubing:
-        details::CancelOverdub();
-        details::StartRecord();
+        CancelOverdub();
+        StartRecord();
         break;
       case State::Playback:
       case State::Overdubed:
-        details::StartRecord();
+        StartRecord();
         break;
       case State::Muted:
-        details::Unmute();
+        Unmute();
         HitRecord();
         break;
       }
     }
-    void HitMute()
+    void Engine::HitMute()
     {
       switch (_status) {
       case State::Idle:
         break;
       case State::Recording:
-        details::CancelRecord();
+        CancelRecord();
         break;
       case State::Overdubing:
-        details::CancelOverdub();
+        CancelOverdub();
         break;
       case State::Playback:
       case State::Overdubed:
-        details::Mute();
+        Mute();
         break;
       case State::Muted:
-        details::Unmute();
+        Unmute();
         break;
       }
     }
 
-    void setMonitorGain(decibel_gain gain)
+    void Engine::setMonitorGain(decibel_gain gain)
     {
       _monitor = gain.rms();
-      Settings.Looper.monitor_gain = gain;
+      _settings->monitor_gain = gain;
       SettingsDirtyFlag = true;
     }
-    void setPlaybackGain(decibel_gain gain)
+    void Engine::setPlaybackGain(decibel_gain gain)
     {
       _playback = gain.rms();
-      Settings.Looper.playback_gain = gain;
+      _settings->playback_gain = gain;
       SettingsDirtyFlag = true;
     }
   }

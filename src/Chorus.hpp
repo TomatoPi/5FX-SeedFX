@@ -38,39 +38,70 @@ namespace sfx
 {
   namespace Chorus
   {
-    using LFO = daisysp::SmoothRandomGenerator;
+    constexpr const size_t BufferSize = sfx::uppow2(sfx::ms2sample(1'000.f, 48'000.f));
+    constexpr const size_t GrainMaxSize = 1L << 15;
+    constexpr const size_t CloudMaxSize = 8;
 
-    sfx::Buffer<BufferSize> DSY_SDRAM_BSS _buffer;
-    float DSY_SDRAM_BSS _window[GrainMaxSize];
+    struct Settings
+    {
+      float delays[Chorus::CloudMaxSize] = { 11.f, 17.f, 29.f, 5.f, 7.f, 19.f, 23.f, 13.f };
+      float frequencies[Chorus::CloudMaxSize] = { 50.f, 20.f, 5.f };
+      float depths[Chorus::CloudMaxSize] = { 0.010f, 0.014f, 0.02f };
 
-    LFO _lfos[CloudMaxSize];
-    size_t _anchors[CloudMaxSize];
-    size_t _times[CloudMaxSize * 2];
-    float _read_hs[CloudMaxSize * 2];
+      float grain_size_ms = 100.f;
+      decibel_gain dry_gain = -0dB;
+      decibel_gain wet_gain = -0dB;
+      decibel_gain feedback_gain = -100dB;
 
-    size_t _grain_length;
-    float _sr;
+      size_t cloud_size = 3;
+      bool bypass = false;
+    };
 
-    float _dry;
-    float _wet;
-    float _feedback;
+    class Engine
+    {
+    public:
 
-    void Init(float samplerate);
-    void Reload();
+      using Buffer = sfx::Buffer<BufferSize>;
+      using Window = float[GrainMaxSize];
+      using LFO = daisysp::SmoothRandomGenerator;
 
-    float Process(float x);
+      void Init(float samplerate, Buffer* buffer, float* window, Settings* settings);
+      void Reload();
 
-    void setFrequency(int voice, float frequency);
-    void setDelay(int voice, float delay);
-    void setDepth(int voice, float depth);
+      float Process(float x);
 
-    void setGrainSize(float size);
-    void setDryGain(decibel_gain gain);
-    void setWetGain(decibel_gain gain);
-    void setFeedbackGain(decibel_gain gain);
+      void setFrequency(int voice, float frequency);
+      void setDelay(int voice, float delay);
+      void setDepth(int voice, float depth);
 
-    void setCloudSize(size_t size);
-    void setBypass(bool bypass);
+      void setGrainSize(float size);
+      void setDryGain(decibel_gain gain);
+      void setWetGain(decibel_gain gain);
+      void setFeedbackGain(decibel_gain gain);
+
+      void setCloudSize(size_t size);
+      void setBypass(bool bypass);
+
+    private:
+
+      float AccumulateVoices();
+
+      Buffer* _buffer;
+      float* _window;
+      Settings* _settings;
+
+      LFO _lfos[CloudMaxSize];
+      size_t _anchors[CloudMaxSize];
+      size_t _times[CloudMaxSize * 2];
+      float _read_hs[CloudMaxSize * 2];
+
+      size_t _grain_length;
+      float _sr;
+
+      float _dry;
+      float _wet;
+      float _feedback;
+    };
   }
 }
 
@@ -82,14 +113,14 @@ namespace sfx
 {
   namespace Chorus
   {
-    float accumulateVoices()
+    float Engine::AccumulateVoices()
     {
       float sample = 0.f;
-      for (size_t i = 0; i < Settings.Chorus.cloud_size; ++i) {
+      for (size_t i = 0; i < _settings->cloud_size; ++i) {
         for (size_t c = 0; c < 2; ++c) {
           size_t time = _times[2 * i + c];
           float read_h = _read_hs[2 * i + c];
-          sample += _window[time] * _buffer.Read(read_h);
+          sample += _window[time] * _buffer->Read(read_h);
           time = (time + 1) % _grain_length;
           if (0 == time) {
             read_h = static_cast<float>(_anchors[i]);
@@ -98,72 +129,76 @@ namespace sfx
           }
           _times[2 * i + c] = time;
           _read_hs[2 * i + c] = fmod(
-            read_h + Settings.Chorus.depths[i] * _lfos[i].Process(), BufferSize);
+            read_h + _settings->depths[i] * _lfos[i].Process(), BufferSize);
         }
         _anchors[i] = (_anchors[i] + 1) & (BufferSize - 1);
       }
-      return sample / (float)Settings.Chorus.cloud_size;
+      return sample / (float)_settings->cloud_size;
     }
 
-    float Process(float x)
+    float Engine::Process(float x)
     {
-      float wet_sample = accumulateVoices();
+      float wet_sample = AccumulateVoices();
       float output = _dry * x + _wet * wet_sample;
-      _buffer.Write(x + _feedback * wet_sample);
-      return Settings.Chorus.bypass ? x : output;
+      _buffer->Write(x + _feedback * wet_sample);
+      return _settings->bypass ? x : output;
     }
 
-    void Init(float samplerate)
+    void Engine::Init(float samplerate, Buffer* buffer, float* window, Settings* settings)
     {
+      _buffer = buffer;
+      _window = window;
+      _settings = settings;
+
       _sr = samplerate;
-      _buffer.Init();
+      _buffer->Init();
       memset(_window, 0, GrainMaxSize * sizeof(float));
       for (size_t i = 0; i < CloudMaxSize; ++i)
         _lfos[i].Init(samplerate);
       Reload();
     }
-    void Reload()
+    void Engine::Reload()
     {
-      setGrainSize(Settings.Chorus.grain_size_ms);
-      setDryGain(Settings.Chorus.dry_gain);
-      setWetGain(Settings.Chorus.wet_gain);
-      setFeedbackGain(Settings.Chorus.feedback_gain);
+      setGrainSize(_settings->grain_size_ms);
+      setDryGain(_settings->dry_gain);
+      setWetGain(_settings->wet_gain);
+      setFeedbackGain(_settings->feedback_gain);
 
-      setCloudSize(Settings.Chorus.cloud_size);
-      setBypass(Settings.Chorus.bypass);
+      setCloudSize(_settings->cloud_size);
+      setBypass(_settings->bypass);
 
-      for (size_t i = 0; i < Settings.Chorus.cloud_size; ++i) {
-        setFrequency(i, Settings.Chorus.frequencies[i]);
-        setDelay(i, Settings.Chorus.delays[i]);
-        setDepth(i, Settings.Chorus.depths[i]);
+      for (size_t i = 0; i < _settings->cloud_size; ++i) {
+        setFrequency(i, _settings->frequencies[i]);
+        setDelay(i, _settings->delays[i]);
+        setDepth(i, _settings->depths[i]);
       }
     }
 
-    void setFrequency(int i, float frequency)
+    void Engine::setFrequency(int i, float frequency)
     {
-      Settings.Chorus.frequencies[i] = frequency;
+      _settings->frequencies[i] = frequency;
       _lfos[i].SetFreq(frequency);
       SettingsDirtyFlag = true;
     }
-    void setDelay(int i, float delay)
+    void Engine::setDelay(int i, float delay)
     {
-      Settings.Chorus.delays[i] = delay;
-      _anchors[i] = (_buffer.write_h + BufferSize - size_t(delay * 0.001f * _sr)) & (BufferSize - 1);
+      _settings->delays[i] = delay;
+      _anchors[i] = (_buffer->write_h + BufferSize - size_t(delay * 0.001f * _sr)) & (BufferSize - 1);
       _read_hs[2 * i + 0] = static_cast<size_t>(_anchors[i]);
       _read_hs[2 * i + 1] = static_cast<size_t>(_anchors[i]);
       SettingsDirtyFlag = true;
     }
-    void setDepth(int i, float depth)
+    void Engine::setDepth(int i, float depth)
     {
-      Settings.Chorus.depths[i] = depth;
+      _settings->depths[i] = depth;
       SettingsDirtyFlag = true;
     }
 
-    void setGrainSize(float size)
+    void Engine::setGrainSize(float size)
     {
-      Settings.Chorus.grain_size_ms = size;
-      _grain_length = Settings.Chorus.grain_size_ms * 0.001f * _sr;
-      for (size_t i = 0; i < Settings.Chorus.cloud_size; ++i) {
+      _settings->grain_size_ms = size;
+      _grain_length = _settings->grain_size_ms * 0.001f * _sr;
+      for (size_t i = 0; i < _settings->cloud_size; ++i) {
         _times[2 * i + 0] = 0;
         _times[2 * i + 1] = _grain_length >> 1;
       }
@@ -172,33 +207,33 @@ namespace sfx
       }
       SettingsDirtyFlag = true;
     }
-    void setDryGain(decibel_gain gain)
+    void Engine::setDryGain(decibel_gain gain)
     {
       _dry = gain.rms();
-      Settings.Chorus.dry_gain = gain;
+      _settings->dry_gain = gain;
       SettingsDirtyFlag = true;
     }
-    void setWetGain(decibel_gain gain)
+    void Engine::setWetGain(decibel_gain gain)
     {
       _wet = gain.rms();
-      Settings.Chorus.wet_gain = gain;
+      _settings->wet_gain = gain;
       SettingsDirtyFlag = true;
     }
-    void setFeedbackGain(decibel_gain gain)
+    void Engine::setFeedbackGain(decibel_gain gain)
     {
       _feedback = gain.rms();
-      Settings.Chorus.feedback_gain = gain;
+      _settings->feedback_gain = gain;
       SettingsDirtyFlag = true;
     }
 
-    void setCloudSize(size_t size)
+    void Engine::setCloudSize(size_t size)
     {
-      Settings.Chorus.cloud_size = size;
+      _settings->cloud_size = size;
       SettingsDirtyFlag = true;
     }
-    void setBypass(bool bypass)
+    void Engine::setBypass(bool bypass)
     {
-      Settings.Chorus.bypass = bypass;
+      _settings->bypass = bypass;
       SettingsDirtyFlag = true;
     }
   }

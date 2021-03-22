@@ -76,57 +76,6 @@ namespace sfx
 {
   namespace Pedalboard
   {
-    void _BindSwitches()
-    {
-      const struct
-      {
-        uint8_t Delay = 0;
-        uint8_t Chorus = 1;
-
-        uint8_t Overdub = 6;
-        uint8_t Record = 7;
-
-        uint8_t Mute = 13;
-        uint8_t Undo = 14;
-        uint8_t Redo = 15;
-      } Bindings;
-
-      bindSwitchAsBypass(
-        Bindings.Delay, []() -> bool { return Settings.Delay.bypass; }, Delay::setBypass);
-      bindSwitchAsBypass(
-        Bindings.Chorus, []() -> bool { return Settings.Chorus.bypass; }, Chorus::setBypass);
-
-      bindLed(Bindings.Record,
-        [](bool) -> bool { return Looper::State::Recording == Looper::_status; });
-      bindSwitchOnFall(Bindings.Record, Looper::HitRecord);
-
-      bindLed(Bindings.Overdub,
-        [](bool) -> bool { return Looper::State::Overdubing == Looper::_status; });
-      bindSwitchOnFall(Bindings.Overdub, Looper::HitOverdub);
-
-      bindLed(Bindings.Undo,
-        [](bool) -> bool
-        {
-          return Looper::State::Playback == Looper::_status
-            || Looper::State::Overdubed == Looper::_status;
-        });
-      bindSwitchOnFall(Bindings.Undo, Looper::HitUndo);
-
-      bindLed(Bindings.Redo,
-        [](bool) -> bool
-        {
-          return
-            (Looper::State::Playback == Looper::_status && 0 < Looper::_stacksize)
-            || (Looper::State::Overdubed == Looper::_status && Looper::_height < Looper::_stacksize)
-            || (Looper::State::Idle == Looper::_status && 0 < Looper::_rec_length);
-        });
-      bindSwitchOnFall(Bindings.Redo, Looper::HitRedo);
-
-      bindLed(Bindings.Mute,
-        [](bool) ->bool { return Looper::State::Muted == Looper::_status; });
-      bindSwitchOnFall(Bindings.Mute, Looper::HitMute);
-    }
-
     void bindSwitch(uint8_t id, const SwitchCallback& callback)
     {
       _switches[id] = callback;
@@ -157,7 +106,6 @@ namespace sfx
 
     void Init()
     {
-      _BindSwitches();
       _states.fill(false);
       for (const auto& [id, callback] : _switches) {
         callback(id, false);

@@ -34,7 +34,7 @@ namespace sfx
   {
     constexpr const uint32_t QSPI_BLOCK_SIZE = 4096;
 
-    constexpr const uint32_t SaveSectionSize = roundup(sizeof(Settings), QSPI_BLOCK_SIZE);
+    constexpr const uint32_t SaveSectionSize = roundup(sizeof(GlobalSettings), QSPI_BLOCK_SIZE);
     constexpr const uint32_t SaveSectionBegin = 0x9000'0000;
     constexpr const uint32_t SaveSectionEnd = SaveSectionBegin + SaveSectionSize;
     uint8_t DSY_QSPI_BSS SaveSectionBlock[SaveSectionSize];
@@ -60,8 +60,8 @@ namespace sfx
       dsy_qspi_erase(SaveSectionBegin, SaveSectionEnd);
       dsy_qspi_write(
         SaveSectionBegin,
-        sizeof(Settings),
-        reinterpret_cast<uint8_t*>(&Settings));
+        sizeof(GlobalSettings),
+        reinterpret_cast<uint8_t*>(&GlobalSettings));
 
       dsy_qspi_deinit();
     }
@@ -73,9 +73,9 @@ namespace sfx
       dsy_qspi_init(&Hardware.qspi_handle);
 
       memcpy(
-        reinterpret_cast<void*>(&Settings),
+        reinterpret_cast<void*>(&GlobalSettings),
         SaveSectionBlock,
-        sizeof(Settings));
+        sizeof(GlobalSettings));
 
       dsy_qspi_deinit();
     }

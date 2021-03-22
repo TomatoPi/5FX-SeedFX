@@ -33,26 +33,51 @@ namespace sfx
 {
   namespace Delay
   {
-    Buffer<BufferSize> DSY_SDRAM_BSS _buffer;
-    size_t _play_h;
-    float _sr;
-    float _in_gain;
+    /// \brief Approx 4s (at 48kHz) buffer for delay
+    constexpr const size_t BufferSize = sfx::uppow2(sfx::ms2sample(4'000.f, 48'000.f));
 
-    float _dry;
-    float _wet;
-    float _feedback;
+    struct Settings
+    {
+      float delay = 500.f;
 
-    void Init(float sr);
-    void Reload();
+      decibel_gain dry_gain = 0dB;
+      decibel_gain wet_gain = -6dB;
+      decibel_gain feedback_gain = -3dB;
 
-    float Process(float x);
+      bool bypass = false;
+    };
 
-    void setDelay(float ms);
-    void setBypass(bool bypass);
+    class Engine
+    {
+    public:
 
-    void setDryGain(decibel_gain gain);
-    void setWetGain(decibel_gain gain);
-    void setFeedbackGain(decibel_gain gain);
+      using Buffer = sfx::Buffer<BufferSize>;
+
+      void Init(float sr, Buffer* buffer, Settings* settings);
+      void Reload();
+
+      float Process(float x);
+
+      void setDelay(float ms);
+      void setBypass(bool bypass);
+
+      void setDryGain(decibel_gain gain);
+      void setWetGain(decibel_gain gain);
+      void setFeedbackGain(decibel_gain gain);
+
+    private:
+
+      Buffer* _buffer;
+      Settings* _settings;
+
+      size_t _play_h;
+      float _sr;
+      float _in_gain;
+
+      float _dry;
+      float _wet;
+      float _feedback;
+    };
   }
 }
 
@@ -64,60 +89,62 @@ namespace sfx
 {
   namespace Delay
   {
-    void Init(float sr)
+    void Engine::Init(float sr, Buffer* buffer, Settings* settings)
     {
-      _buffer.Init();
+      _buffer = buffer;
+      _settings = settings;
+      _buffer->Init();
       _sr = sr;
       Reload();
     }
-    void Reload()
+    void Engine::Reload()
     {
-      setDelay(Settings.Delay.delay);
-      setBypass(Settings.Delay.bypass);
+      setDelay(_settings->delay);
+      setBypass(_settings->bypass);
 
-      setDryGain(Settings.Delay.dry_gain);
-      setWetGain(Settings.Delay.wet_gain);
-      setFeedbackGain(Settings.Delay.feedback_gain);
+      setDryGain(_settings->dry_gain);
+      setWetGain(_settings->wet_gain);
+      setFeedbackGain(_settings->feedback_gain);
     }
 
-    float Process(float x)
+    float Engine::Process(float x)
     {
-      float wet_sample = _buffer.Read(_play_h);
+      float wet_sample = _buffer->Read(_play_h);
       float feed_sample = x * _in_gain + wet_sample * _feedback;
       _play_h = (_play_h + 1) & (BufferSize - 1);
-      _buffer.Write(feed_sample);
+      _buffer->Write(feed_sample);
       return x * _dry + wet_sample * _wet;
     }
 
-    void setDelay(float ms)
+    void Engine::setDelay(float ms)
     {
-      Settings.Delay.delay = ms;
-      _play_h = (_buffer.write_h + BufferSize - size_t(ms * 0.001f * _sr)) & (BufferSize - 1);
+      _settings->delay = ms;
+      _play_h = (_buffer->write_h + BufferSize - size_t(ms * 0.001f * _sr)) & (BufferSize - 1);
       SettingsDirtyFlag = true;
     }
-    void setBypass(bool bypass)
+    void Engine::setBypass(bool bypass)
     {
-      Settings.Delay.bypass = bypass;
+      _settings->bypass = bypass;
       _in_gain = bypass ? 0.f : 1.f;
       SettingsDirtyFlag = true;
     }
 
-    void setDryGain(decibel_gain gain)
+    void Engine::setDryGain(decibel_gain gain)
     {
       _dry = gain.rms();
-      Settings.Delay.dry_gain = gain;
+      _settings->dry_gain = gain;
       SettingsDirtyFlag = true;
     }
-    void setWetGain(decibel_gain gain)
+    void Engine::setWetGain(decibel_gain gain)
     {
       _wet = gain.rms();
-      Settings.Delay.wet_gain = gain;
+      _settings->wet_gain = gain;
       SettingsDirtyFlag = true;
     }
-    void setFeedbackGain(decibel_gain gain)
+    void Engine::setFeedbackGain(decibel_gain gain)
     {
       _feedback = gain.rms();
-      Settings.Delay.feedback_gain = gain;
+      _settings->feedback_gain = gain;
       SettingsDirtyFlag = true;
     }
   }

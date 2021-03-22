@@ -1,5 +1,4 @@
 #include "src/Global.hpp"
-#include "src/Save.hpp"
 #include "src/Pedalboard.hpp"
 
 #include "src/Utils.hpp"
@@ -22,6 +21,90 @@ constexpr const uint32_t MAIN_LOOP_FRAMETIME = 1;
 sfx::midi::Parser<64, 16> midi_parser;
 daisy::RingBuffer<sfx::midi::RawEvent, 16> midi_out_buffer;
 
+Chorus::Engine::Buffer DSY_SDRAM_BSS ChorusBuffer0;
+Chorus::Engine::Window DSY_SDRAM_BSS ChorusWindowBuffer0;
+Chorus::Engine Chorus0;
+
+Delay::Engine::Buffer DSY_SDRAM_BSS DelayBuffer0;
+Delay::Engine Delay0;
+
+sfx::Looper::Engine::Buffer DSY_SDRAM_BSS LooperBuffer0, LooperBuffer1;
+sfx::Looper::Engine Looper0, Looper1, * LooperX = nullptr;
+
+struct
+{
+  struct
+  {
+    decibel_gain input_gain = 0dB;
+    decibel_gain output_gain = 0dB;
+  } Channel0, Channel1;
+
+  Chorus::Settings Chorus0;
+  Delay::Settings Delay0;
+  Looper::Settings Looper0, Looper1;
+} GlobalSettings;
+
+#include "src/Save.hpp"
+
+const struct
+{
+  uint8_t Delay = 0;
+  uint8_t Chorus = 1;
+
+  uint8_t SelLooper0 = 4;
+  uint8_t SelLooper1 = 12;
+
+  uint8_t Overdub = 6;
+  uint8_t Record = 7;
+
+  uint8_t Mute = 13;
+  uint8_t Undo = 14;
+  uint8_t Redo = 15;
+} Bindings;
+
+void _BindSwitches()
+{
+
+  Pedalboard::bindSwitchAsBypass(
+    Bindings.Delay,
+    []() -> bool { return GlobalSettings.Delay0.bypass; },
+    [](bool b) -> void { Delay0.setBypass(b); });
+  Pedalboard::bindSwitchAsBypass(
+    Bindings.Chorus,
+    []() -> bool { return GlobalSettings.Chorus0.bypass; },
+    [](bool b) -> void { Chorus0.setBypass(b); });
+
+  Pedalboard::bindLed(Bindings.Record,
+    [](bool) -> bool { return Looper::Engine::State::Recording == LooperX->GetState(); });
+  Pedalboard::bindSwitchOnFall(Bindings.Record, []() -> void { LooperX->HitRecord(); });
+
+  Pedalboard::bindLed(Bindings.Overdub,
+    [](bool) -> bool { return Looper::Engine::State::Overdubing == LooperX->GetState(); });
+  Pedalboard::bindSwitchOnFall(Bindings.Overdub, []() -> void { LooperX->HitOverdub(); });
+
+  Pedalboard::bindLed(Bindings.Undo,
+    [](bool) -> bool
+    {
+      return Looper::Engine::State::Playback == LooperX->GetState()
+        || Looper::Engine::State::Overdubed == LooperX->GetState();
+    });
+  Pedalboard::bindSwitchOnFall(Bindings.Undo, []() -> void { LooperX->HitUndo(); });
+
+  Pedalboard::bindLed(Bindings.Redo,
+    [](bool) -> bool
+    {
+      return
+        (Looper::Engine::State::Playback == LooperX->GetState() && 0 < LooperX->_stacksize)
+        || (Looper::Engine::State::Overdubed == LooperX->GetState() && LooperX->_height < LooperX->_stacksize)
+        || (Looper::Engine::State::Idle == LooperX->GetState() && 0 < LooperX->_rec_length);
+    });
+  Pedalboard::bindSwitchOnFall(Bindings.Redo, []() -> void { LooperX->HitRedo(); });
+
+  Pedalboard::bindLed(Bindings.Mute,
+    [](bool) ->bool { return Looper::Engine::State::Muted == LooperX->GetState(); });
+  Pedalboard::bindSwitchOnFall(Bindings.Mute, []() -> void { LooperX->HitMute(); });
+}
+
 void sfx::Pedalboard::setLed(uint8_t id, bool state)
 {
   midi_out_buffer.Write(
@@ -34,21 +117,21 @@ namespace callbacks
   {
     void channel_0(float* in, float* out, size_t nsamples)
     {
-      float in_gain = Settings.Channel0.input_gain.rms();
-      float out_gain = Settings.Channel0.output_gain.rms();
+      float in_gain = GlobalSettings.Channel0.input_gain.rms();
+      float out_gain = GlobalSettings.Channel0.output_gain.rms();
       for (size_t i = 0; i < nsamples; ++i) {
         float sample = in_gain * in[i];
-        sample = sfx::Chorus::Process(sample);
-        sample = sfx::Delay::Process(sample);
-        sample = sfx::Looper::Process(sample);
+        sample = Chorus0.Process(sample);
+        sample = Delay0.Process(sample);
+        sample = Looper0.Process(sample);
         out[i] = out_gain * sample;
       }
     }
 
     void channel_1(float* in, float* out, size_t nsamples)
     {
-      float in_gain = Settings.Channel1.input_gain.rms();
-      float out_gain = Settings.Channel1.output_gain.rms();
+      float in_gain = GlobalSettings.Channel1.input_gain.rms();
+      float out_gain = GlobalSettings.Channel1.output_gain.rms();
       for (size_t i = 0; i < nsamples; i++) {
         float sample = in_gain * in[i];
         out[i] = out_gain * sample;
@@ -60,7 +143,7 @@ namespace callbacks
   {
     void expr0(float val)
     {
-      Settings.Channel0.input_gain = sfx::powlerp(val, 1.f / 8.f, -100dB, 0dB);
+      GlobalSettings.Channel0.input_gain = sfx::powlerp(val, 1.f / 8.f, -100dB, 0dB);
     }
     void expr1(float val)
     {
@@ -138,10 +221,15 @@ int main(void)
   midi_parser.Init();
   midi_out_buffer.Init();
 
-  Chorus::Init(Hardware.AudioSampleRate());
-  Looper::Init(Hardware.AudioSampleRate());
-  Delay::Init(Hardware.AudioSampleRate());
+  Chorus0.Init(Hardware.AudioSampleRate(), &ChorusBuffer0, ChorusWindowBuffer0, &GlobalSettings.Chorus0);
+  Delay0.Init(Hardware.AudioSampleRate(), &DelayBuffer0, &GlobalSettings.Delay0);
+  Looper0.Init(Hardware.AudioSampleRate(), &LooperBuffer0, &GlobalSettings.Looper0);
 
+  Looper1.Init(Hardware.AudioSampleRate(), &LooperBuffer1, &GlobalSettings.Looper1);
+
+  LooperX = &Looper0;
+
+  _BindSwitches();
   Pedalboard::Init();
 
   Hardware.StartAudio(AudioCallback);
