@@ -25,30 +25,27 @@
 #pragma once
 
 #include <cmath>
+#include <type_traits>
 
 struct decibel_gain
 {
   float value;
 
-  explicit constexpr decibel_gain(long double v = 0.f) : value(v) {}
-  explicit constexpr decibel_gain(unsigned long long int v = 0) : value(v) {}
+  template <typename Numeric>
+  explicit constexpr decibel_gain(Numeric v = static_cast<Numeric>(0)) :
+    value(static_cast<float>(v))
+  {
+  }
 
-  constexpr inline float rms() const;
-  constexpr inline decibel_gain operator- () const;
+  constexpr inline float rms() const
+  {
+    return powf(10.f, value / 10.f);
+  }
+  constexpr inline decibel_gain operator- () const
+  {
+    return decibel_gain{ -(long double)value };
+  }
 };
-
-constexpr inline decibel_gain operator+ (const decibel_gain& a, const decibel_gain& b)
-{
-  return decibel_gain{ (long double)(a.value + b.value) };
-}
-constexpr inline decibel_gain operator- (const decibel_gain& a, const decibel_gain& b)
-{
-  return decibel_gain{ (long double)(a.value - b.value) };
-}
-constexpr inline decibel_gain operator* (float x, const decibel_gain& a)
-{
-  return decibel_gain{ (long double)(a.value * x) };
-}
 
 constexpr decibel_gain operator"" dB(long double db)
 {
@@ -59,15 +56,17 @@ constexpr decibel_gain operator"" dB(unsigned long long int db)
   return decibel_gain(db);
 }
 
-///////////////////////////////////////////////////////////////////////
-
-///////////////////////////////////////////////////////////////////////
-
-constexpr inline float decibel_gain::rms() const
+constexpr inline decibel_gain operator+ (const decibel_gain& a, const decibel_gain& b)
 {
-  return powf(10.f, value / 10.f);
+  return decibel_gain{ (long double)(a.value + b.value) };
 }
-constexpr decibel_gain decibel_gain::operator- () const
+constexpr inline decibel_gain operator- (const decibel_gain& a, const decibel_gain& b)
 {
-  return decibel_gain{ -(long double)value };
+  return decibel_gain{ (long double)(a.value - b.value) };
+}
+template <typename Numeric>
+constexpr inline decibel_gain operator* (Numeric x, const decibel_gain& a)
+{
+  static_assert(std::is_arithmetic<Numeric>::value, "x must be a numeric value");
+  return decibel_gain{ (long double)(a.value * x) };
 }
