@@ -35,7 +35,7 @@ namespace sfx
   namespace Looper
   {
     /// \brief At least 5min (at 48kHz) buffer for looper
-    constexpr const size_t BufferSize = sfx::uppow2(sfx::ms2sample(2.f * 60'000.f, 48'000.f));
+    constexpr const size_t BufferSize = sfx::uppow2(sfx::ms2sample(4.f * 60'000.f, 48'000.f));
 
     struct Settings
     {
@@ -104,7 +104,8 @@ namespace sfx
     public:
 
       Buffer* _buffer;
-      Settings *_settings;
+      Settings* _settings;
+      Engine* _link;
       size_t _max_height;
       size_t _height, _stacksize;
       size_t _play_h, _rec_length;
@@ -131,22 +132,34 @@ namespace sfx
 
     void Engine::StartRecord()
     {
-      _buffer->write_h = 0;
-      _max_height = 0;
-      _height = _stacksize = 0;
-      _play_h = _rec_length = 0;
-      _status = State::Recording;
+      Engine* tmp = this;
+      do {
+        tmp->_buffer->write_h = 0;
+        tmp->_max_height = 0;
+        tmp->_height = tmp->_stacksize = 0;
+        tmp->_play_h = tmp->_rec_length = 0;
+        tmp->_status = State::Recording;
+        tmp = tmp->_link;
+      } while (tmp && tmp != this);
     }
     void Engine::CancelRecord()
     {
-      _status = State::Idle;
+      Engine* tmp = this;
+      do {
+        tmp->_status = State::Idle;
+        tmp = tmp->_link;
+      } while (tmp && tmp != this);
     }
     void Engine::EndRecord()
     {
-      _height = _stacksize = 0;
-      _play_h = 0;
-      _max_height = (BufferSize / _rec_length) - 1;
-      _status = State::Playback;
+      Engine* tmp = this;
+      do {
+        tmp->_height = tmp->_stacksize = 0;
+        tmp->_play_h = 0;
+        tmp->_max_height = (BufferSize / tmp->_rec_length) - 1;
+        tmp->_status = State::Playback;
+        tmp = tmp->_link;
+      } while (tmp && tmp != this);
     }
 
     void Engine::TryStartOverdub()
@@ -258,6 +271,8 @@ namespace sfx
       _play_h = _rec_length = 0;
       _status = State::Idle;
       _muteback = State::Idle;
+
+      _link = nullptr;
 
       setMonitorGain(_settings->monitor_gain);
       setPlaybackGain(_settings->playback_gain);

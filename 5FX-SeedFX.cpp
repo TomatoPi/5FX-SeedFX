@@ -21,15 +21,15 @@ constexpr const uint32_t MAIN_LOOP_FRAMETIME = 1;
 sfx::midi::Parser<64, 16> midi_parser;
 daisy::RingBuffer<sfx::midi::RawEvent, 16> midi_out_buffer;
 
-Chorus::Engine::Buffer DSY_SDRAM_BSS ChorusBuffer0;
+Chorus::Engine::Buffer DSY_SDRAM_BSS ChorusBuffer0, ChorusBuffer1;
 Chorus::Engine::Window DSY_SDRAM_BSS ChorusWindowBuffer0;
-Chorus::Engine Chorus0;
+Chorus::Engine Chorus0, Chorus1;
 
-Delay::Engine::Buffer DSY_SDRAM_BSS DelayBuffer0;
-Delay::Engine Delay0;
+Delay::Engine::Buffer DSY_SDRAM_BSS DelayBuffer0, DelayBuffer1;
+Delay::Engine Delay0, Delay1;
 
-sfx::Looper::Engine::Buffer DSY_SDRAM_BSS LooperBuffer0, LooperBuffer1;
-sfx::Looper::Engine Looper0, Looper1, * LooperX = nullptr;
+sfx::Looper::Engine::Buffer DSY_SDRAM_BSS LooperBuffer0;//, LooperBuffer1;
+sfx::Looper::Engine Looper0, /*Looper1,*/ * LooperX = nullptr;
 
 struct
 {
@@ -39,8 +39,8 @@ struct
     decibel_gain output_gain = 0dB;
   } Channel0, Channel1;
 
-  Chorus::Settings Chorus0;
-  Delay::Settings Delay0;
+  Chorus::Settings Chorus0, Chorus1;
+  Delay::Settings Delay0, Delay1;
   Looper::Settings Looper0, Looper1;
 } GlobalSettings;
 
@@ -48,8 +48,11 @@ struct
 
 const struct
 {
-  uint8_t Delay = 0;
-  uint8_t Chorus = 1;
+  uint8_t Delay0 = 0;
+  uint8_t Chorus0 = 1;
+  
+  uint8_t Delay1 = 8;
+  uint8_t Chorus1 = 9;
 
   uint8_t SelLooper0 = 4;
   uint8_t SelLooper1 = 12;
@@ -64,15 +67,37 @@ const struct
 
 void _BindSwitches()
 {
-
   Pedalboard::bindSwitchAsBypass(
-    Bindings.Delay,
+    Bindings.Delay0,
     []() -> bool { return GlobalSettings.Delay0.bypass; },
     [](bool b) -> void { Delay0.setBypass(b); });
   Pedalboard::bindSwitchAsBypass(
-    Bindings.Chorus,
+    Bindings.Chorus0,
     []() -> bool { return GlobalSettings.Chorus0.bypass; },
     [](bool b) -> void { Chorus0.setBypass(b); });
+
+  Pedalboard::bindSwitchAsBypass(
+    Bindings.Delay1,
+    []() -> bool { return GlobalSettings.Delay1.bypass; },
+    [](bool b) -> void { Delay1.setBypass(b); });
+  Pedalboard::bindSwitchAsBypass(
+    Bindings.Chorus1,
+    []() -> bool { return GlobalSettings.Chorus1.bypass; },
+    [](bool b) -> void { Chorus1.setBypass(b); });
+
+  Pedalboard::bindSwitch(
+    Bindings.SelLooper0,
+    [](uint8_t, bool state) -> void { if (state) { LooperX = &Looper0; } });
+  Pedalboard::bindLed(
+    Bindings.SelLooper0,
+    [](bool) -> bool { return LooperX == &Looper0; });
+
+  Pedalboard::bindSwitch(
+    Bindings.SelLooper1,
+    [](uint8_t, bool state) -> void { if (state) { LooperX = &Looper0; } });
+  Pedalboard::bindLed(
+    Bindings.SelLooper1,
+    [](bool) -> bool { return LooperX == &Looper0; });
 
   Pedalboard::bindLed(Bindings.Record,
     [](bool) -> bool { return Looper::Engine::State::Recording == LooperX->GetState(); });
@@ -134,6 +159,9 @@ namespace callbacks
       float out_gain = GlobalSettings.Channel1.output_gain.rms();
       for (size_t i = 0; i < nsamples; i++) {
         float sample = in_gain * in[i];
+        sample = Chorus1.Process(sample);
+        sample = Delay1.Process(sample);
+        // sample = Looper1.Process(sample);
         out[i] = out_gain * sample;
       }
     }
@@ -147,7 +175,7 @@ namespace callbacks
     }
     void expr1(float val)
     {
-
+      GlobalSettings.Channel1.input_gain = sfx::powlerp(val, 1.f / 8.f, -100dB, 0dB);
     }
 
     void expr(uint8_t channel, uint8_t val)
@@ -225,8 +253,12 @@ int main(void)
   Delay0.Init(Hardware.AudioSampleRate(), &DelayBuffer0, &GlobalSettings.Delay0);
   Looper0.Init(Hardware.AudioSampleRate(), &LooperBuffer0, &GlobalSettings.Looper0);
 
-  Looper1.Init(Hardware.AudioSampleRate(), &LooperBuffer1, &GlobalSettings.Looper1);
+  Chorus1.Init(Hardware.AudioSampleRate(), &ChorusBuffer1, ChorusWindowBuffer0, &GlobalSettings.Chorus1);
+  Delay1.Init(Hardware.AudioSampleRate(), &DelayBuffer1, &GlobalSettings.Delay1);
+  //Looper1.Init(Hardware.AudioSampleRate(), &LooperBuffer1, &GlobalSettings.Looper1);
 
+  // Looper0._link = &Looper1;
+  // Looper1._link = &Looper0;
   LooperX = &Looper0;
 
   _BindSwitches();
