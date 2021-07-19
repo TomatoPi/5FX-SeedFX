@@ -44,7 +44,7 @@ namespace sfx
       decibel_gain wet_gain = -6dB;
       decibel_gain feedback_gain = -3dB;
 
-      bool bypass = false;
+      bool bypass = true;
     };
 
     class Engine

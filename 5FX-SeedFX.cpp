@@ -1,5 +1,5 @@
 #include "src/Global.hpp"
-#include "src/Pedalboard.hpp"
+// #include "src/Pedalboard.hpp"
 
 #include "src/Utils.hpp"
 #include "src/Chorus.hpp"
@@ -12,6 +12,7 @@
 
 #include <Utility/smooth_random.h>
 #include <Noise/clockednoise.h>
+#include <Dynamics/compressor.h>
 
 using namespace sfx;
 
@@ -31,6 +32,10 @@ Delay::Engine Delay0, Delay1;
 sfx::Looper::Engine::Buffer DSY_SDRAM_BSS LooperBuffer0;//, LooperBuffer1;
 sfx::Looper::Engine Looper0, /*Looper1,*/ * LooperX = nullptr;
 
+size_t EditedChorusVoice = 0;
+
+daisysp::Compressor Compressor0;
+
 struct
 {
   struct
@@ -42,6 +47,12 @@ struct
   Chorus::Settings Chorus0, Chorus1;
   Delay::Settings Delay0, Delay1;
   Looper::Settings Looper0, Looper1;
+
+  struct
+  {
+    bool bypass = true;
+  } Compressor0;
+
 } GlobalSettings;
 
 #include "src/Save.hpp"
@@ -50,13 +61,13 @@ const struct
 {
   uint8_t Delay0 = 0;
   uint8_t Chorus0 = 1;
+  uint8_t Compressor0 = 2;
   
   uint8_t Delay1 = 8;
   uint8_t Chorus1 = 9;
 
-  uint8_t SelLooper0 = 4;
-  uint8_t SelLooper1 = 12;
-
+  uint8_t Multiply = 4;
+  uint8_t Oneshot = 5;
   uint8_t Overdub = 6;
   uint8_t Record = 7;
 
@@ -75,6 +86,10 @@ void _BindSwitches()
     Bindings.Chorus0,
     []() -> bool { return GlobalSettings.Chorus0.bypass; },
     [](bool b) -> void { Chorus0.setBypass(b); });
+  Pedalboard::bindSwitchAsBypass(
+    Bindings.Compressor0,
+    []() -> bool { return GlobalSettings.Compressor0.bypass; },
+    [](bool b) -> void { GlobalSettings.Compressor0.bypass = b; });
 
   Pedalboard::bindSwitchAsBypass(
     Bindings.Delay1,
@@ -85,19 +100,14 @@ void _BindSwitches()
     []() -> bool { return GlobalSettings.Chorus1.bypass; },
     [](bool b) -> void { Chorus1.setBypass(b); });
 
-  Pedalboard::bindSwitch(
-    Bindings.SelLooper0,
-    [](uint8_t, bool state) -> void { if (state) { LooperX = &Looper0; } });
-  Pedalboard::bindLed(
-    Bindings.SelLooper0,
-    [](bool) -> bool { return LooperX == &Looper0; });
 
-  Pedalboard::bindSwitch(
-    Bindings.SelLooper1,
-    [](uint8_t, bool state) -> void { if (state) { LooperX = &Looper0; } });
-  Pedalboard::bindLed(
-    Bindings.SelLooper1,
-    [](bool) -> bool { return LooperX == &Looper0; });
+  Pedalboard::bindLed(Bindings.Multiply,
+    [](bool) -> bool { return Looper::Engine::State::Multiplying == LooperX->GetState(); });
+  Pedalboard::bindSwitchOnFall(Bindings.Multiply, []() -> void { LooperX->HitMultiply(); });
+
+  Pedalboard::bindLed(Bindings.Oneshot,
+    [](bool) -> bool { return Looper::Engine::State::Oneshot == LooperX->GetState(); });
+  Pedalboard::bindSwitchOnFall(Bindings.Oneshot, []() -> void { LooperX->HitOneshot(); });
 
   Pedalboard::bindLed(Bindings.Record,
     [](bool) -> bool { return Looper::Engine::State::Recording == LooperX->GetState(); });
@@ -118,10 +128,11 @@ void _BindSwitches()
   Pedalboard::bindLed(Bindings.Redo,
     [](bool) -> bool
     {
+      bool canrestack(LooperX->_height < LooperX->_stacksize);
       return
-        (Looper::Engine::State::Playback == LooperX->GetState() && 0 < LooperX->_stacksize)
-        || (Looper::Engine::State::Overdubed == LooperX->GetState() && LooperX->_height < LooperX->_stacksize)
-        || (Looper::Engine::State::Idle == LooperX->GetState() && 0 < LooperX->_rec_length);
+        (Looper::Engine::State::Playback == LooperX->GetState() && canrestack)
+        || (Looper::Engine::State::Overdubed == LooperX->GetState() && canrestack)
+        || (Looper::Engine::State::Idle == LooperX->GetState() && canrestack);
     });
   Pedalboard::bindSwitchOnFall(Bindings.Redo, []() -> void { LooperX->HitRedo(); });
 
@@ -144,13 +155,24 @@ namespace callbacks
     {
       float in_gain = GlobalSettings.Channel0.input_gain.rms();
       float out_gain = GlobalSettings.Channel0.output_gain.rms();
-      for (size_t i = 0; i < nsamples; ++i) {
-        float sample = in_gain * in[i];
-        sample = Chorus0.Process(sample);
-        sample = Delay0.Process(sample);
-        sample = Looper0.Process(sample);
-        out[i] = out_gain * sample;
-      }
+
+      if (!GlobalSettings.Compressor0.bypass)
+        for (size_t i = 0; i < nsamples; ++i) {
+          float sample = in_gain * in[i];
+          sample = Compressor0.Process(sample);
+          sample = Chorus0.Process(sample);
+          sample = Delay0.Process(sample);
+          sample = Looper0.Process(sample);
+          out[i] = out_gain * sample;
+        }
+      else
+        for (size_t i = 0; i < nsamples; ++i) {
+          float sample = in_gain * in[i];
+          sample = Chorus0.Process(sample);
+          sample = Delay0.Process(sample);
+          sample = Looper0.Process(sample);
+          out[i] = out_gain * sample;
+        }
     }
 
     void channel_1(float* in, float* out, size_t nsamples)
@@ -200,6 +222,43 @@ namespace callbacks
       case 0x0B:
         expr(channel, val);
         break;
+      case 0x10:
+        Chorus0.setFrequency(EditedChorusVoice, mapcc(val, 0.1f, 100.f));
+        break;
+      case 0x11:
+        Chorus0.setDelay(EditedChorusVoice, mapcc(val, 1.f, 30.f));
+        break;
+      case 0x12:
+        Chorus0.setDepth(EditedChorusVoice, mapcc(val, 0.f, 0.1f));
+        break;
+      case 0x13:
+        if (64 <= val)
+        {
+          EditedChorusVoice += 1;
+          if (GlobalSettings.Chorus0.cloud_size <= EditedChorusVoice)
+            EditedChorusVoice = GlobalSettings.Chorus0.cloud_size -1;
+        }
+        else 
+        {
+          if (0 < EditedChorusVoice)
+            EditedChorusVoice -= 1;
+        }
+        break;
+      case 0x14:
+        size_t size = GlobalSettings.Chorus0.cloud_size;
+        if (64 <= val)
+        {
+          size += 1;
+          if (Chorus::CloudMaxSize <= size)
+            size = Chorus::CloudMaxSize -1;
+        }
+        else 
+        {
+          if (0 < size)
+            size -= 1;
+        }
+        Chorus0.setCloudSize(size);
+        break;
       }
     }
 
@@ -242,6 +301,8 @@ int main(void)
   Hardware.Configure();
   Hardware.Init();
 
+  // persist::LoadFromQSPI();
+
   daisy::UartHandler uart1;
   uart1.Init();
   uart1.StartRx();
@@ -252,6 +313,13 @@ int main(void)
   Chorus0.Init(Hardware.AudioSampleRate(), &ChorusBuffer0, ChorusWindowBuffer0, &GlobalSettings.Chorus0);
   Delay0.Init(Hardware.AudioSampleRate(), &DelayBuffer0, &GlobalSettings.Delay0);
   Looper0.Init(Hardware.AudioSampleRate(), &LooperBuffer0, &GlobalSettings.Looper0);
+  Compressor0.Init(Hardware.AudioSampleRate());
+
+  Compressor0.SetAttack(0.1);
+  Compressor0.SetMakeup(30);
+  Compressor0.SetRatio(3);
+  Compressor0.SetRelease(1);
+  Compressor0.SetThreshold(-60);
 
   Chorus1.Init(Hardware.AudioSampleRate(), &ChorusBuffer1, ChorusWindowBuffer0, &GlobalSettings.Chorus1);
   Delay1.Init(Hardware.AudioSampleRate(), &DelayBuffer1, &GlobalSettings.Delay1);

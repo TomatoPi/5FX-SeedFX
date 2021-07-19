@@ -45,15 +45,15 @@ namespace sfx
     struct Settings
     {
       float delays[Chorus::CloudMaxSize] = { 11.f, 17.f, 29.f, 5.f, 7.f, 19.f, 23.f, 13.f };
-      float frequencies[Chorus::CloudMaxSize] = { 50.f, 20.f, 5.f };
-      float depths[Chorus::CloudMaxSize] = { 0.010f, 0.014f, 0.02f };
+      float frequencies[Chorus::CloudMaxSize] = { 5.f, 20.f, 5.f };
+      float depths[Chorus::CloudMaxSize] = { 0.030f, 0.014f, 0.02f };
 
       float grain_size_ms = 100.f;
       decibel_gain dry_gain = -0dB;
       decibel_gain wet_gain = -0dB;
       decibel_gain feedback_gain = -100dB;
 
-      size_t cloud_size = 3;
+      size_t cloud_size = 1;
       bool bypass = false;
     };
 
