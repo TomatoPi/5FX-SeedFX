@@ -1,0 +1,5 @@
+{
+    "configuration": "mode=on",
+    "board": "arduino:megaavr:nona4809",
+    "sketch": "../../../../Documents/2.0/progs/Optopoulpe/driver/driver.ino"
+}

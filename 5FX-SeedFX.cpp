@@ -5,7 +5,7 @@
 #include "src/Chorus.hpp"
 #include "src/Looper.hpp"
 #include "src/Delay.hpp"
-#include "src/Midi.hpp"
+#include "src/Serial.hpp"
 
 #include <daisy_seed.h>
 #include <per/uart.h>
@@ -14,13 +14,34 @@
 #include <Noise/clockednoise.h>
 #include <Dynamics/compressor.h>
 
+
+daisy::UartHandler uart1;
+
+static serial::messages::Scan::DeviceDescription _SeedFXDeviceDescriptor =
+{
+  {'S', 'e', 'e', 'd', 'F', 'X'},
+  0xA0,
+  1,
+
+  0
+};
+static uint8_t last_scan_uid = 0xE1;
+
+serial::messages::Scan GenerateScanMessage() {
+  serial::messages::Scan msg;
+  msg.device = _SeedFXDeviceDescriptor;
+  msg.scan_uid = ++last_scan_uid;
+  return msg;
+}
+
 using namespace sfx;
 
 constexpr const bool DEBUG_WITH_MIDI = false;
 constexpr const uint32_t MAIN_LOOP_FRAMETIME = 1;
 
-sfx::midi::Parser<64, 16> midi_parser;
-daisy::RingBuffer<sfx::midi::RawEvent, 16> midi_out_buffer;
+serial::SerialParser serial_in;
+daisy::RingBuffer<serial::Packet, 32> serial_in_buffer;
+daisy::RingBuffer<serial::Packet, 32> serial_out_buffer;
 
 Chorus::Engine::Buffer DSY_SDRAM_BSS ChorusBuffer0, ChorusBuffer1;
 Chorus::Engine::Window DSY_SDRAM_BSS ChorusWindowBuffer0;
@@ -143,8 +164,10 @@ void _BindSwitches()
 
 void sfx::Pedalboard::setLed(uint8_t id, bool state)
 {
-  midi_out_buffer.Write(
-    sfx::midi::RawEvent(3, 0xB0 | id, 0x03, state ? 0x7F : 0x00));
+  // serial::messages::SetLed msg;
+  // msg.index = id;
+  // msg.state = state;
+  // serial_out_buffer.Write(serial::Serialize(msg));
 }
 
 namespace callbacks
@@ -189,126 +212,163 @@ namespace callbacks
     }
   }
 
-  namespace midi
+  // namespace midi
+  // {
+  //   void expr0(float val)
+  //   {
+  //     GlobalSettings.Channel0.input_gain = sfx::powlerp(val, 1.f / 8.f, -100dB, 0dB);
+  //   }
+  //   void expr1(float val)
+  //   {
+  //     GlobalSettings.Channel1.input_gain = sfx::powlerp(val, 1.f / 8.f, -100dB, 0dB);
+  //   }
+
+  //   void expr(uint8_t channel, uint8_t val)
+  //   {
+  //     float fval = val / 127.f;
+  //     switch (channel) {
+  //     case 0:
+  //       expr0(fval);
+  //       break;
+  //     case 1:
+  //       expr1(fval);
+  //       break;
+  //     }
+  //   }
+
+  //   void control_change(uint8_t channel, uint8_t cc, uint8_t val)
+  //   {
+  //     switch (cc) {
+  //     case 0x04:
+  //       Pedalboard::UpdateSwitch(channel, 64 <= val);
+  //       break;
+  //     case 0x0B:
+  //       expr(channel, val);
+  //       break;
+  //     case 0x10:
+  //       Chorus0.setFrequency(EditedChorusVoice, mapcc(val, 0.1f, 100.f));
+  //       break;
+  //     case 0x11:
+  //       Chorus0.setDelay(EditedChorusVoice, mapcc(val, 1.f, 30.f));
+  //       break;
+  //     case 0x12:
+  //       Chorus0.setDepth(EditedChorusVoice, mapcc(val, 0.f, 0.1f));
+  //       break;
+  //     case 0x13:
+  //       if (64 <= val)
+  //       {
+  //         EditedChorusVoice += 1;
+  //         if (GlobalSettings.Chorus0.cloud_size <= EditedChorusVoice)
+  //           EditedChorusVoice = GlobalSettings.Chorus0.cloud_size -1;
+  //       }
+  //       else 
+  //       {
+  //         if (0 < EditedChorusVoice)
+  //           EditedChorusVoice -= 1;
+  //       }
+  //       break;
+  //     case 0x14:
+  //       size_t size = GlobalSettings.Chorus0.cloud_size;
+  //       if (64 <= val)
+  //       {
+  //         size += 1;
+  //         if (Chorus::CloudMaxSize <= size)
+  //           size = Chorus::CloudMaxSize -1;
+  //       }
+  //       else 
+  //       {
+  //         if (0 < size)
+  //           size -= 1;
+  //       }
+  //       Chorus0.setCloudSize(size);
+  //       break;
+  //     }
+  //   }
+
+  //   void program_change(uint8_t channel, uint8_t pgm)
+  //   {
+  //     switch (channel) {
+  //     case 15:
+  //       Pedalboard::UpdateLeds();
+  //       break;
+  //     }
+  //   }
+
+  //   void events()
+  //   {
+  //     while (serial_in_buffer.readable())
+  //     {
+  //       serial::Packet packet = serial_in_buffer.Read();
+  //       switch (packet.header[serial::Packet::Header::Type])
+  //       {
+  //         default :
+  //           // Err
+  //           break;
+  //       }
+  //     }
+  //   }
+  // } // namespace midi
+
+  namespace serial
   {
-    void expr0(float val)
+    void process_input_message(const ::serial::Packet& packet)
     {
-      GlobalSettings.Channel0.input_gain = sfx::powlerp(val, 1.f / 8.f, -100dB, 0dB);
-    }
-    void expr1(float val)
-    {
-      GlobalSettings.Channel1.input_gain = sfx::powlerp(val, 1.f / 8.f, -100dB, 0dB);
-    }
-
-    void expr(uint8_t channel, uint8_t val)
-    {
-      float fval = val / 127.f;
-      switch (channel) {
-      case 0:
-        expr0(fval);
-        break;
-      case 1:
-        expr1(fval);
-        break;
-      }
-    }
-
-    void control_change(uint8_t channel, uint8_t cc, uint8_t val)
-    {
-      switch (cc) {
-      case 0x04:
-        Pedalboard::UpdateSwitch(channel, 64 <= val);
-        break;
-      case 0x0B:
-        expr(channel, val);
-        break;
-      case 0x10:
-        Chorus0.setFrequency(EditedChorusVoice, mapcc(val, 0.1f, 100.f));
-        break;
-      case 0x11:
-        Chorus0.setDelay(EditedChorusVoice, mapcc(val, 1.f, 30.f));
-        break;
-      case 0x12:
-        Chorus0.setDepth(EditedChorusVoice, mapcc(val, 0.f, 0.1f));
-        break;
-      case 0x13:
-        if (64 <= val)
+      switch (packet.header[::serial::Packet::Header::Type])
+      {
+        case ::serial::messages::Types::Scan :
         {
-          EditedChorusVoice += 1;
-          if (GlobalSettings.Chorus0.cloud_size <= EditedChorusVoice)
-            EditedChorusVoice = GlobalSettings.Chorus0.cloud_size -1;
-        }
-        else 
-        {
-          if (0 < EditedChorusVoice)
-            EditedChorusVoice -= 1;
-        }
-        break;
-      case 0x14:
-        size_t size = GlobalSettings.Chorus0.cloud_size;
-        if (64 <= val)
-        {
-          size += 1;
-          if (Chorus::CloudMaxSize <= size)
-            size = Chorus::CloudMaxSize -1;
-        }
-        else 
-        {
-          if (0 < size)
-            size -= 1;
-        }
-        Chorus0.setCloudSize(size);
-        break;
-      }
-    }
+          auto scan = packet.read<::serial::messages::Scan>();
+          if (scan.scan_uid != last_scan_uid)
+          {
+            last_scan_uid = scan.scan_uid;
+            
+            ::serial::messages::Scan msg;
+            msg.device = _SeedFXDeviceDescriptor;
+            msg.scan_uid = scan.scan_uid;
 
-    void program_change(uint8_t channel, uint8_t pgm)
-    {
-      switch (channel) {
-      case 15:
-        Pedalboard::UpdateLeds();
-        break;
-      }
-    }
+            serial_out_buffer.Write(::serial::Serialize(msg));
+            // TODO : do things with the new peripheral
+          }
+        } break;
 
-    void events()
-    {
-      using namespace sfx::midi;
-      while (midi_parser.HasNext()) {
-        sfx::midi::Event event = midi_parser.NextEvent();
-        switch (event.status) {
-        case Status::ControlChange:
-          control_change(event.channel, event.d1, event.d2);
+        case ::serial::messages::Types::QueryDevice :
+        {
+          auto query = packet.read<::serial::messages::QueryDevice>();
+          if (_SeedFXDeviceDescriptor.uuid == query.uuid)
+          {
+            for (size_t i=0 ; i < sfx::_descriptors_cout ; ++i)
+            {
+              serial_out_buffer.Write(::serial::Serialize(_descriptors[i]));
+            }
+          }
+        } break;
+
+        default :
           break;
-        case Status::ProgramChange:
-          program_change(event.channel, event.d1);
-          break;
-        }
       }
     }
-  }
-}
+  } // namespace serial
+
+} // namespace callbacks
 
 void AudioCallback(float** in, float** out, size_t size)
 {
-  if (!DEBUG_WITH_MIDI) callbacks::midi::events();
   callbacks::audio::channel_0(in[0], out[0], size);
   callbacks::audio::channel_1(in[1], out[1], size);
 }
 
 int main(void)
 {
+
   Hardware.Configure();
   Hardware.Init();
 
   // persist::LoadFromQSPI();
-
-  daisy::UartHandler uart1;
   uart1.Init();
   uart1.StartRx();
 
-  midi_parser.Init();
-  midi_out_buffer.Init();
+  serial_in_buffer.Init();
+  serial_out_buffer.Init();
 
   Chorus0.Init(Hardware.AudioSampleRate(), &ChorusBuffer0, ChorusWindowBuffer0, &GlobalSettings.Chorus0);
   Delay0.Init(Hardware.AudioSampleRate(), &DelayBuffer0, &GlobalSettings.Delay0);
@@ -334,30 +394,45 @@ int main(void)
 
   Hardware.StartAudio(AudioCallback);
 
+  _SeedFXDeviceDescriptor.params_count = _descriptors_cout;
+  serial_out_buffer.Write(serial::Serialize(GenerateScanMessage()));
+
   SettingsDirtyFlag = false;
 
   while (1) {
     if (!uart1.RxActive()) {
       uart1.FlushRx();
       uart1.StartRx();
-      midi_parser.cur_length = midi_parser.expected_length = 0;
+      serial_in.error(0);
     }
     while (uart1.Readable()) {
-      midi_parser.Parse(uart1.PopRx());
-    }
-    if (DEBUG_WITH_MIDI) {
-      while (midi_parser.HasNext()) {
-        midi::Event event = midi_parser.NextEvent();
-        // debug code here
+      uint8_t byte = uart1.PopRx();
+      serial::ParsingResult result = serial_in.parse(byte);
+
+      switch (result.status)
+      {
+      case serial::ParsingResult::Status::Running:
+        break;
+      case serial::ParsingResult::Status::Started:
+        // drop = false;
+        break;
+      case serial::ParsingResult::Status::Finished:
+        callbacks::serial::process_input_message(result.packet);
+        break;
+      case serial::ParsingResult::Status::EndOfStream:
+        break;
+      default:
+        serial_in.error(0);
+        break;
       }
     }
     if (Pedalboard::dirtyFlag) {
       Pedalboard::dirtyFlag = false;
       Pedalboard::UpdateLeds();
     }
-    while (midi_out_buffer.readable()) {
-      sfx::midi::RawEvent raw = midi_out_buffer.Read();
-      uart1.PollTx(raw.buffer, raw.length);
+    while (serial_out_buffer.readable()) {
+      serial::Packet packet = serial_out_buffer.Read();
+      uart1.PollTx(const_cast<uint8_t*>(packet.serialize()), packet.size());daisy::System::Delay(50);
     }
     if (SettingsDirtyFlag) {
       persist::SaveToQSPI();

@@ -110,9 +110,9 @@ namespace sfx
       for (const auto& [id, callback] : _switches) {
         callback(id, false);
       }
-      for (const auto& [id, binding] : _leds) {
-        setLed(id, binding(false));
-      }
+      // for (const auto& [id, binding] : _leds) {
+      //   setLed(id, binding(false));
+      // }
     }
     void UpdateLeds()
     {

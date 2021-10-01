@@ -26,6 +26,7 @@
 
 #include "Global.hpp"
 #include "Utils.hpp"
+#include "Param.hpp"
 
 #include <dev/sdram.h>
 #include <Utility/smooth_random.h>
@@ -38,23 +39,47 @@ namespace sfx
 {
   namespace Chorus
   {
+    namespace Params 
+    {
+      namespace Voice
+      {
+        static constexpr const char Delays[16] = "V-Delays";
+        static constexpr const char Frequencies[16] = "V-Frequencies";
+        static constexpr const char Depths[16] = "V-Depths";
+      }
+
+      static constexpr const char GrainSize[16] = "Grain-Size";
+
+      static constexpr const char DryGain[16] = "Dry-Gain";
+      static constexpr const char WetGain[16] = "Wet-Gain";
+      static constexpr const char Feedback[16] = "Feedback";
+
+      static constexpr const char CloudSize[16] = "Clound-Size";
+      static constexpr const char Bypass[16] = "Bypass";
+    }
+    // namespace Params
+
     constexpr const size_t BufferSize = sfx::uppow2(sfx::ms2sample(1'000.f, 48'000.f));
     constexpr const size_t GrainMaxSize = 1L << 15;
     constexpr const size_t CloudMaxSize = 8;
 
     struct Settings
     {
-      float delays[Chorus::CloudMaxSize] = { 11.f, 17.f, 29.f, 5.f, 7.f, 19.f, 23.f, 13.f };
-      float frequencies[Chorus::CloudMaxSize] = { 5.f, 20.f, 5.f };
-      float depths[Chorus::CloudMaxSize] = { 0.030f, 0.014f, 0.02f };
+      // = { 11.f, 17.f, 29.f, 5.f, 7.f, 19.f, 23.f, 13.f };
+      ::sfx::FloatArray<Params::Voice::Delays, 0x10, Chorus::CloudMaxSize, 1, 1> delays;
+      // = { 5.f, 20.f, 5.f };
+      ::sfx::FloatArray<Params::Voice::Frequencies, 0x11, Chorus::CloudMaxSize, 1, 1> frequencies;
+      // = { 0.030f, 0.014f, 0.02f };
+      ::sfx::FloatArray<Params::Voice::Depths, 0x12, Chorus::CloudMaxSize, 1, 1> depths;
 
-      float grain_size_ms = 100.f;
-      decibel_gain dry_gain = -0dB;
-      decibel_gain wet_gain = -0dB;
-      decibel_gain feedback_gain = -100dB;
+      ::sfx::Float<Params::GrainSize, 0x18, 1, 1> grain_size_ms; //= 100.f;
 
-      size_t cloud_size = 1;
-      bool bypass = false;
+      ::sfx::Gain<Params::DryGain, 0x19, 1, 1> dry_gain; //= -0dB;
+      ::sfx::Gain<Params::WetGain, 0x1A, 1, 1> wet_gain; //= -0dB;
+      ::sfx::Gain<Params::Feedback, 0x1B, 1, 1> feedback_gain; //= -100dB;
+
+      ::sfx::Size<Params::CloudSize, 0x1E, 1, 1> cloud_size; //= -1;
+      ::sfx::Boolean<Params::Bypass, 0x1E, 1, 1> bypass; //= false;
     };
 
     class Engine
@@ -129,7 +154,7 @@ namespace sfx
           }
           _times[2 * i + c] = time;
           _read_hs[2 * i + c] = fmod(
-            read_h + _settings->depths[i] * _lfos[i].Process(), BufferSize);
+            read_h + _settings->depths.values[i] * _lfos[i].Process(), BufferSize);
         }
         _anchors[i] = (_anchors[i] + 1) & (BufferSize - 1);
       }
@@ -168,21 +193,21 @@ namespace sfx
       setBypass(_settings->bypass);
 
       for (size_t i = 0; i < _settings->cloud_size; ++i) {
-        setFrequency(i, _settings->frequencies[i]);
-        setDelay(i, _settings->delays[i]);
-        setDepth(i, _settings->depths[i]);
+        setFrequency(i, _settings->frequencies.values[i]);
+        setDelay(i, _settings->delays.values[i]);
+        setDepth(i, _settings->depths.values[i]);
       }
     }
 
     void Engine::setFrequency(int i, float frequency)
     {
-      _settings->frequencies[i] = frequency;
+      _settings->frequencies.values[i] = frequency;
       _lfos[i].SetFreq(frequency);
       SettingsDirtyFlag = true;
     }
     void Engine::setDelay(int i, float delay)
     {
-      _settings->delays[i] = delay;
+      _settings->delays.values[i] = delay;
       _anchors[i] = (_buffer->write_h + BufferSize - size_t(delay * 0.001f * _sr)) & (BufferSize - 1);
       _read_hs[2 * i + 0] = static_cast<size_t>(_anchors[i]);
       _read_hs[2 * i + 1] = static_cast<size_t>(_anchors[i]);
@@ -190,7 +215,7 @@ namespace sfx
     }
     void Engine::setDepth(int i, float depth)
     {
-      _settings->depths[i] = depth;
+      _settings->depths.values[i] = depth;
       SettingsDirtyFlag = true;
     }
 

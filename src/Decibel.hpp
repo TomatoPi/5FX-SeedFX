@@ -31,6 +31,8 @@ struct decibel_gain
 {
   float value;
 
+  decibel_gain() : value(0.f) {}
+
   template <typename Numeric>
   explicit constexpr decibel_gain(Numeric v = static_cast<Numeric>(0)) :
     value(static_cast<float>(v))

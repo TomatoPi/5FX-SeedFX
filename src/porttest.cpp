@@ -5,23 +5,20 @@
 #include <cstring>
 #include <iostream>
 
-constexpr const size_t Msglen = 8;
-std::queue<std::array<uint8_t, Msglen>> sendingqueue;
+std::queue<std::array<uint8_t, 3>> sendingqueue;
 jack_port_t* outport=nullptr;
 
 int callback(jack_nframes_t nframes, void* args)
 {
-  void* buffer = jack_port_get_buffer(outport, nframes);
-  jack_midi_clear_buffer(buffer);
-  static int i = 0;
-  if (++i <= 40000)
-  {
-    i = 0;
-    jack_midi_data_t* data = jack_midi_event_reserve(buffer, 0, Msglen);
-    data[0] = 0x90;
-    data[1] = 0x35;
-    data[2] = 0x7f;
-  }
+  // void* buffer = jack_port_get_buffer(outport, nframes);
+  // jack_midi_clear_buffer(buffer);
+  // while (!sendingqueue.empty())
+  // {
+  //   jack_midi_data_t* data = jack_midi_event_reserve(buffer, 0, 3);
+  //   auto event = sendingqueue.front();
+  //   memcpy(data, event.data(), 3);
+  //   sendingqueue.pop();
+  // }
   return 0;
 }
 
@@ -32,7 +29,7 @@ int main(int argc, const char* argv[])
   if (!client)
     return -1;
   
-  outport = jack_port_register(client, "out", JACK_DEFAULT_MIDI_TYPE, JackPortIsOutput, 0);
+  outport = jack_port_register(client, "output", "SFX_IPC", JackPortIsOutput, 16);
   if (!outport)
     return -2;
 
@@ -44,13 +41,9 @@ int main(int argc, const char* argv[])
 
   while (1)
   {
-    std::array<uint8_t, Msglen> tmp;
-    for (int i=0; i<Msglen; ++i)
-    {
-      int d = 0;
-      scanf(" %d", &d);
-      tmp[i] = d;
-    }
+    std::array<uint8_t, 3> tmp;
+    for (int i=0; i<3; ++i)
+      scanf(" %x", &tmp[i]);
 
     // std::cout << "Dump [";
     // for (auto x : tmp) 
