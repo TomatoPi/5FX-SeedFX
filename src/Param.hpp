@@ -9,8 +9,8 @@
 namespace sfx
 {
 
-  static std::array<::serial::messages::ParamDescription, 0xFF> _descriptors;
-  static size_t _descriptors_cout = 0;
+  extern std::array<sfx::messages::ParamDescriptor, 0xFF> _params_descriptors;
+  extern size_t _params_descriptors_cout;
 
   #define Param_T \
       typename T, \
@@ -29,8 +29,8 @@ namespace sfx
       if (!initialized)
       {
         initialized = true;
-        _descriptors[_descriptors_cout] = descriptor();
-        _descriptors_cout += 1;
+        _params_descriptors[_params_descriptors_cout] = descriptor();
+        _params_descriptors_cout += 1;
       }
       else
       {
@@ -45,15 +45,15 @@ namespace sfx
 
     size_t size() const { return Length; }
 
-    static ::serial::messages::ParamDescription descriptor() {
-      ::serial::messages::ParamDescription desc;
+    static sfx::messages::ParamDescriptor descriptor() {
+      sfx::messages::ParamDescriptor desc;
 
       uint8_t* name = (uint8_t*) desc.name;
       for (const char* c = Name ; *c != '\0' ; ++c, ++name)
         *name = *c;
       *name = '\0';
 
-      desc.uuid = UUID;
+      desc.param_uuid = UUID;
       desc.type = Type;
 
       desc.array_len = Length;
@@ -65,7 +65,7 @@ namespace sfx
     }
   };
 
-  using ParamTypes = ::serial::messages::ParamDescription::ParamTypes;
+  using ParamTypes = sfx::messages::ParamDescriptor::ParamTypes;
 
 
   #define ARRAY_PARAM_T \

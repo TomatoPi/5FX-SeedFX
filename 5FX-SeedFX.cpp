@@ -1,3 +1,4 @@
+#include "src/hw/hw.hpp"
 #include "src/Global.hpp"
 // #include "src/Pedalboard.hpp"
 
