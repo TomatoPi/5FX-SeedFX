@@ -1,33 +1,40 @@
 #pragma once
 
-#include "dllist.hpp"
+#include "alloc.hpp"
 
 #include <stddef.h>
 #include <stdint.h>
 
 namespace sfx
 {
-  namespace utils
+  namespace alloc
   {
-    class allocator_t {
+    class heterogenous_allocator_t : public allocator_i {
     public:
 
       struct memblock_desc_t {
         memblock_desc_t*  next;
-        size_t blocksize;
+        int16_t signed_blocksize;
 
         /// Small hack, this +1 return the first address after this struct,
         ///   which is the memory block itself
         void* memblock() { return this +1; }
         const void* memblock() const { return this +1; }
 
+        size_t blocksize() const
+        {
+          return signed_blocksize < 0 ? -signed_blocksize : signed_blocksize;
+        }
+
+        bool is_free() const { return signed_blocksize < 0; }
+
         memblock_desc_t* next_contiguous_block() const
         {
-          return (memblock_desc_t*)(((uint8_t*)memblock()) + blocksize);
+          return (memblock_desc_t*)(((uint8_t*)memblock()) + blocksize());
         }
       };
 
-      allocator_t(uint8_t* memory, size_t memsize) :
+      heterogenous_allocator_t(uint8_t* memory, size_t memsize) :
         memory{ memory }, memsize{ memsize },
         free_blocks_anchor{ reinterpret_cast<memblock_desc_t*>(memory), 0 },
         occupied_blocks_anchor{ nullptr, 0 }
@@ -35,7 +42,7 @@ namespace sfx
         clear();
       }
 
-      void* alloc(size_t size) 
+      void* alloc(size_t size) override
       {
         memblock_desc_t** block_ptr = firstblock_big_enought_for(size);
         if (nullptr == block_ptr || nullptr == *block_ptr)
@@ -47,12 +54,14 @@ namespace sfx
 
         // put the block in occupied list
         memblock_desc_t* tmp = newblock->next;
+        newblock->signed_blocksize = newblock->blocksize();
         newblock->next = occupied_blocks_anchor.next;
         occupied_blocks_anchor.next = newblock;
         *block_ptr = tmp;
         
         if (nullptr != garbage)
         {
+          garbage->signed_blocksize = -garbage->blocksize();
           garbage->next = free_blocks_anchor.next;
           free_blocks_anchor.next = garbage;
         }
@@ -61,7 +70,7 @@ namespace sfx
         return newblock->memblock();
       }
 
-      int free(void* ptr)
+      int free(void* ptr) override
       {
         memblock_desc_t** desc_ptr = owner_of(ptr);
         if (nullptr == desc_ptr || nullptr == *desc_ptr)
@@ -72,22 +81,56 @@ namespace sfx
         memblock_desc_t* tmp = freedblock->next;
         freedblock->next = free_blocks_anchor.next;
         free_blocks_anchor.next = freedblock;
+        freedblock->signed_blocksize = -freedblock->blocksize();
         *desc_ptr = tmp;
 
         return 0;
       }
 
-      void clear()
+      void clear() override
       {
-        occupied_blocks_anchor.blocksize = 0;
+        occupied_blocks_anchor.signed_blocksize = 0;
         occupied_blocks_anchor.next = nullptr;
 
-        free_blocks_anchor.blocksize = 0;
+        free_blocks_anchor.signed_blocksize = 0;
         free_blocks_anchor.next = reinterpret_cast<memblock_desc_t*>(memory);
 
         memblock_desc_t* firstblock = free_blocks_anchor.next;
-        firstblock->blocksize = memsize - sizeof(memblock_desc_t);
+        firstblock->signed_blocksize = memsize - sizeof(memblock_desc_t);
+        firstblock->signed_blocksize = -firstblock->blocksize();
         firstblock->next = nullptr;
+      }
+
+      void optimize_memory()
+      {
+        memblock_desc_t** free_ptr = &free_blocks_anchor.next;
+        memblock_desc_t** occupied_ptr = &occupied_blocks_anchor.next;
+        
+        for (
+          memblock_desc_t* tmp = reinterpret_cast<memblock_desc_t*>(memory);
+          (uint8_t*)tmp < memory + memsize;
+          tmp = tmp->next_contiguous_block())
+        {
+          if (tmp->is_free())
+          {
+            memblock_desc_t* merge_candidate = tmp->next_contiguous_block();
+            while (merge_candidate->is_free())
+            {
+              tmp->signed_blocksize -= merge_candidate->blocksize();
+              tmp->signed_blocksize -= sizeof(memblock_desc_t);
+              merge_candidate = tmp->next_contiguous_block();
+            }
+            *free_ptr = tmp;
+            free_ptr = &tmp->next;
+          }
+          else // tmp is in use
+          {
+            *occupied_ptr = tmp;
+            occupied_ptr = &tmp->next;
+          }
+        }
+        // close both lists
+        *free_ptr = *occupied_ptr = nullptr;
       }
 
       size_t max_available_size() const
@@ -98,8 +141,8 @@ namespace sfx
           tmp != nullptr;
           tmp = tmp->next)
         {
-          if (max < tmp->blocksize)
-            max = tmp->blocksize;
+          if (max < tmp->blocksize())
+            max = tmp->blocksize();
         }
         return max;
       }
@@ -116,7 +159,7 @@ namespace sfx
           tmp != nullptr && *tmp != nullptr;
           tmp = &((*tmp)->next))
         {
-          if (size <= (*tmp)->blocksize)
+          if (size <= (*tmp)->blocksize())
             return tmp;
         }
         return nullptr;
@@ -139,16 +182,17 @@ namespace sfx
       {
         // To split a block, we need at least some place to
         //  store the next descriptor 
-        if (block->blocksize < newsize + sizeof(memblock_desc_t))
+        if (block->blocksize() < newsize + sizeof(memblock_desc_t))
           return nullptr;
         // compute created block size
-        size_t old_blocksize = block->blocksize;
+        size_t old_blocksize = block->blocksize();
         size_t remaining_mem = old_blocksize - newsize - sizeof(memblock_desc_t);
         // reduce block size
-        block->blocksize = newsize;
+        block->signed_blocksize = newsize;
         // create the new free block
         memblock_desc_t* newblock = block->next_contiguous_block();
-        newblock->blocksize = remaining_mem;
+        newblock->signed_blocksize = remaining_mem;
+        newblock->signed_blocksize = -newblock->blocksize();
         // done
         return newblock;
       }
