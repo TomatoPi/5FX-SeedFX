@@ -2,7 +2,7 @@
 TARGET = 5FX-SeedFX
 
 # Sources
-CPP_SOURCES = 5FX-SeedFX.cpp
+CPP_SOURCES = 5FX-SeedFX2.cpp
 
 # Library Locations
 LIBDAISY_DIR = ../../libdaisy

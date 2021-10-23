@@ -8,12 +8,12 @@
             "intelliSenseMode": "",
             "includePath": [
                 "${workspaceFolder}/**",
-                "/home/tomato/.pkg/DaisyExamples/libdaisy/src",
-                "/home/tomato/.pkg/DaisyExamples/libdaisy/src/sys",
-                "/home/tomato/.pkg/DaisyExamples/libdaisy/Drivers/CMSIS/Include",
-                "/home/tomato/.pkg/DaisyExamples/libdaisy/Drivers/STM32H7xx_HAL_Driver/Inc",
-                "/home/tomato/.pkg/DaisyExamples/libdaisy/Drivers/CMSIS/Device/ST/STM32H7xx/Include",
-                "${workspaceFolder}/../../libDaisy/**",
+                "/home/tomato/libdaisy/src",
+                "/home/tomato/libdaisy/src/sys",
+                "/home/tomato/libdaisy/Drivers/CMSIS/Include",
+                "/home/tomato/libdaisy/Drivers/STM32H7xx_HAL_Driver/Inc",
+                "/home/tomato/libdaisy/Drivers/CMSIS/Device/ST/STM32H7xx/Include",
+                "${workspaceFolder}/../../libdaisy/**",
                 "${workspaceFolder}/../../DaisySP/**"
             ],
             "forcedInclude": [],
