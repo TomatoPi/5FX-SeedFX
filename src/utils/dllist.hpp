@@ -5,7 +5,7 @@ namespace sfx
   namespace utils
   {
     /// Double linked anchored list
-    class dlalist_t {
+    class dllist_t {
     public :
       struct node_t {
         node_t(void* obj = nullptr) : 

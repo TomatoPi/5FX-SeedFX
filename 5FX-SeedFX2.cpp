@@ -1,4 +1,5 @@
 #include "src/jack/Graph.hpp"
+#include "src/utils/alloc.hpp"
 
 #include "daisy_seed.h"
 

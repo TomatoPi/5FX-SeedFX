@@ -73,7 +73,8 @@ namespace sfx
 
     class graph_t {
     public:
-      
+
+
     };
   }
   // namespace jack
