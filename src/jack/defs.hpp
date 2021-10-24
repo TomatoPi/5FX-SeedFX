@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stddef.h>
+#include <stdint.h>
 
 namespace sfx
 {
@@ -8,11 +9,10 @@ namespace sfx
   {
     /// Forward declarations
 
-    struct port_t;
-    struct input_port_t;
-    struct output_port_t;
-
     struct module_t;
+
+    using port_id_t = int8_t;
+    using module_id_t = int8_t;
 
     /// Descriptors, used to tell jack what is what
 
@@ -21,39 +21,44 @@ namespace sfx
       bool is_physical;
       bool is_terminal;
       bool is_input;
-
-      port_descriptor_t* next;
     };
 
     struct module_descriptor_t {
-      const char*               name;
-      const port_descriptor_t** ports;
-      size_t                    nports;
-
+      const char* name;
       int (*callback)(module_t*);
     };
 
     /// Concrete objects manipulated by outside code
 
-    struct input_port_t {
-      const float*  buffer;
-      input_port_t* next;
+    struct buffer_t {
+      float* samples;
     };
 
-    struct output_port_t {
-      float*          buffer;
-      output_port_t*  next;
+    struct connection_t {
+      port_id_t     src;
+      port_id_t     dst;
+      connection_t* next;
     };
 
+    struct port_t {
+      const port_descriptor_t* descriptor;
+
+      buffer_t* buffer;
+      module_t* module;
+
+      port_id_t uid;
+
+      connection_t* connections;
+      port_t*       next;
+    };
+    
     struct module_t {
       const module_descriptor_t* descriptor;
       
-      input_port_t*   inputs_lst;
-      output_port_t*  outputs_lst;
+      port_id_t*  ports;
+      module_id_t uid;
 
-      void* args;
-
-      size_t uid;
+      void*       args;
     };
   }
   // namespace jack

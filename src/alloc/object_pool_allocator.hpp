@@ -29,6 +29,8 @@ namespace sfx
         poolsize{ poolsize }
         { clear(); }
 
+      void* raw_memory() { return descriptors; }
+
       void* alloc(size_t) override
       {
         return alloc();
@@ -50,12 +52,14 @@ namespace sfx
 
       int free(void* ptr) override
       {
-        index_t idx = indexof(ptr);
+        size_t idx = indexof(ptr);
+        if (idx < 0 || poolsize <= idx)
+          return -1;
         object_descriptor_t* tmp;
         // find the node pointing to target object
         for (
           tmp = &occupied_slots_anchor;
-          tmp->next_idx != -1 && tmp->next_idx != idx;
+          tmp->next_idx != -1 && (size_t)tmp->next_idx != idx;
           tmp = &descriptors[tmp->next_idx])
         {
         }
@@ -95,6 +99,39 @@ namespace sfx
       {
         return (size_t)((uint8_t*)ptr - objects) / objectsize;
       }
+
+      void* get(size_t index)
+      {
+        return index < poolsize ? objects + (index * objectsize) : nullptr;
+      }
+      const void* get(size_t index) const
+      {
+        return index < poolsize ? objects + (index * objectsize) : nullptr;
+      }
+
+
+      struct iterator {
+        pool_allocator_t* allocator;
+        index_t index;
+
+        void* operator* () { return allocator->get(index); }
+        const void* operator* () const { return allocator->get(index); }
+
+        iterator& operator++ ()
+        {
+          index = allocator->descriptors[index].next_idx;
+          return *this;
+        }
+
+        explicit operator bool() const { return -1 != index; }
+        friend bool operator== (const iterator& a, const iterator& b)
+        {
+          return a.allocator == b.allocator && a.index == b.index;
+        }
+      };
+
+      iterator begin() { return { this, occupied_slots_anchor.next_index }; }
+      iterator end() { return { this, -1 }; }
 
     private:
 

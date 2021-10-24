@@ -6,19 +6,39 @@ namespace sfx
 {
   namespace jack
   {
-    int init(size_t max_ports_count);
+    enum result_e {
+      Success = 0,
 
-    int set_blocksize(size_t blocksize);
+      OutOfMemory,
+      MemoryError,
+      InvalidState,
+
+      InvalidArguments,
+
+      IllegalConnection,
+      InputPortAlreadyConnected,
+      ExistingConnection,
+
+      PortsNotConnected,
+    };
+
+    result_e init(size_t max_modules_count, size_t max_ports_count);
+    result_e deinint();
+
+    result_e set_blocksize(size_t blocksize);
     
-    int recompute_process_graph();
+    result_e recompute_process_graph();
 
     module_t* create_module(const module_descriptor_t* desc);
-    int destroy_module(module_t* module);
+    result_e destroy_module(module_t* module);
 
-    int connect(output_port_t* src, input_port_t* dest);
-    int disconnect(output_port_t* src, output_port_t* dest);
+    port_t* create_port(module_t* module, const port_descriptor_t* desc);
+    result_e destroy_port(port_t* port);
 
-    int process_callback(const float* const* physical_in, float** physical_out);
+    result_e connect(port_id_t src, port_id_t dest);
+    result_e disconnect(port_id_t src, port_id_t dest);
+
+    result_e process_callback(const float* const* physical_in, float** physical_out);
   }
   // namespace jack
 }
