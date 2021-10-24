@@ -9,10 +9,9 @@ namespace sfx
 {
   namespace alloc
   {
+    template <typename index_t>
     class pool_allocator_t : allocator_i {
     public:
-
-      using index_t = int16_t;
 
       struct object_descriptor_t {
         index_t next_idx;
@@ -23,7 +22,7 @@ namespace sfx
         return poolsize * (objectsize + sizeof(object_descriptor_t));
       }
 
-      pool_allocator_t(uint8_t* memory, size_t objectsize, size_t poolsize) :
+      pool_allocator_t(uint8_t* memory = nullptr, size_t objectsize = 0, size_t poolsize = 0) :
         descriptors{ reinterpret_cast<object_descriptor_t*>(memory) },
         objects{ reinterpret_cast<uint8_t*>(&descriptors[poolsize]) },
         objectsize{ objectsize },
@@ -72,11 +71,17 @@ namespace sfx
 
       void clear() override
       {
-        free_slots_anchor.next_idx = 0;
+        free_slots_anchor.next_idx = -1;
         occupied_slots_anchor.next_idx = -1;
+
         for (size_t i=0 ; i<poolsize ; ++i)
           descriptors[i].next_idx = i+1;
-        descriptors[poolsize-1].next_idx = -1;
+
+        if (0 < poolsize)
+        {
+          free_slots_anchor.next_idx = 0;
+          descriptors[poolsize-1].next_idx = -1;
+        }
       }
 
       index_t free_lst() const { return free_slots_anchor.next_idx; }
@@ -90,7 +95,7 @@ namespace sfx
       {
         return (size_t)((uint8_t*)ptr - objects) / objectsize;
       }
-      
+
     private:
 
 

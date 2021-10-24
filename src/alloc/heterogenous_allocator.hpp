@@ -93,12 +93,17 @@ namespace sfx
         occupied_blocks_anchor.next = nullptr;
 
         free_blocks_anchor.signed_blocksize = 0;
-        free_blocks_anchor.next = reinterpret_cast<memblock_desc_t*>(memory);
+        free_blocks_anchor.next = nullptr;
 
-        memblock_desc_t* firstblock = free_blocks_anchor.next;
-        firstblock->signed_blocksize = memsize - sizeof(memblock_desc_t);
-        firstblock->signed_blocksize = -firstblock->blocksize();
-        firstblock->next = nullptr;
+        if (0 < memsize)
+        {
+          free_blocks_anchor.next = reinterpret_cast<memblock_desc_t*>(memory);
+
+          memblock_desc_t* firstblock = free_blocks_anchor.next;
+          firstblock->signed_blocksize = memsize - sizeof(memblock_desc_t);
+          firstblock->signed_blocksize = -firstblock->blocksize();
+          firstblock->next = nullptr;
+        }
       }
 
       void optimize_memory()

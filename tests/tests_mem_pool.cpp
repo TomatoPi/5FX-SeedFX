@@ -38,6 +38,8 @@ void dump_memory(const sfx::alloc::pool_allocator_t* alloc)
 
 int main(int argc, const char* argv[])
 {
+  srand(0);
+  
   sfx::alloc::pool_allocator_t allocator{ memory, objectsize, poolsize };
   dump_memory(&allocator);
 
