@@ -16,11 +16,17 @@ namespace sfx
 
     /// Descriptors, used to tell jack what is what
 
+    enum port_flags_e {
+      PORT_NONE         = 0x00,
+      PORT_IS_INPUT     = 0x01,
+      PORT_IS_OUTPUT    = 0x02,
+      PORT_IS_TERMINAL  = 0x04,
+      PORT_IS_PHYSICAL  = 0x08,
+    };
+  
     struct port_descriptor_t {
       const char* name;
-      bool is_physical;
-      bool is_terminal;
-      bool is_input;
+      int flags;
     };
 
     struct module_descriptor_t {
@@ -55,7 +61,7 @@ namespace sfx
     struct module_t {
       const module_descriptor_t* descriptor;
       
-      port_id_t*  ports;
+      port_t*  ports;
       module_id_t uid;
 
       void*       args;

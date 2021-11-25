@@ -117,9 +117,15 @@ namespace sfx
         void* operator* () { return allocator->get(index); }
         const void* operator* () const { return allocator->get(index); }
 
+        template <typename T>
+        T* get() { return (T*)allocator->get(index); }
+        template <typename T>
+        const T* get() const { return (const T*)allocator->get(index); }
+
         iterator& operator++ ()
         {
-          index = allocator->descriptors[index].next_idx;
+          if (-1 != index)
+            index = allocator->descriptors[index].next_idx;
           return *this;
         }
 

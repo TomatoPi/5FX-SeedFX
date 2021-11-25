@@ -44,10 +44,10 @@ namespace sfx
       template <typename pool_allocator_t>
       result_e free_pool(pool_allocator_t* allocator)
       {
-        if (nullptr != allocator.raw_memory())
-          if (0 != _main_allocator->free(allocator.raw_memory()))
+        if (nullptr != allocator->raw_memory())
+          if (0 != _main_allocator->free(allocator->raw_memory()))
             return MemoryError;
-        allocator = pool_allocator_t(nullptr);
+        *allocator = pool_allocator_t(nullptr);
         return Success;
       }
 
@@ -114,19 +114,66 @@ namespace sfx
 
     module_t* create_module(const module_descriptor_t* desc)
     {
-      return nullptr;
+      module_t* module = (module_t*) _jack_modules_allocator.alloc();
+      if (nullptr == module)
+        return nullptr;
+      else
+      {
+        module->descriptor = desc;
+        
+        module->ports = nullptr;
+        module->uid = _jack_modules_allocator.indexof(module);
+        
+        module->args = nullptr;
+        return module;
+      }
     }
     result_e destroy_module(module_t* module)
     {
+      for (port_t* tmp = module->ports ; tmp != nullptr ; tmp = module->ports)
+        if (result_e err = destroy_port(tmp); Success != err)
+          return err;
+      if (0 != _jack_modules_allocator.free(module))
+        return MemoryError;
       return Success;
     }
 
     port_t* create_port(module_t* module, const port_descriptor_t* desc)
     {
-      return nullptr;
+      port_t* port = (port_t*) _jack_ports_allocator.alloc();
+      if (nullptr == port)
+        return nullptr;
+      else
+      {
+        port->descriptor = desc;
+
+        port->buffer = nullptr;
+        port->module = module;
+        port->uid = _jack_ports_allocator.indexof(port);
+
+        port->connections = nullptr;
+        port_t** link;
+        for (link = &(module->ports) ; *link != nullptr ; link = &((*link)->next))
+          { /* empty body */ }
+        *link = port;
+
+        return port;
+      }
     }
     result_e destroy_port(port_t* port)
     {
+      port_t** link;
+      for (
+        link = &(port->module->ports) ;
+        *link != port && *link != nullptr ;
+        link = &((*link)->next))
+      { /* empty body */ }
+      if (nullptr == *link)
+        return InvalidState;
+
+      *link = port->next;
+      _jack_ports_allocator.free(port);
+
       return Success;
     }
 
@@ -137,7 +184,11 @@ namespace sfx
       if (nullptr == src || nullptr == dst)
         return InvalidArguments;
 
-      if (src->descriptor->is_physical && dst->descriptor->is_physical)
+      if ((src->descriptor->flags & PORT_IS_PHYSICAL) 
+        && (dst->descriptor->flags & PORT_IS_PHYSICAL))
+        return IllegalConnection;
+      if (!(src->descriptor->flags & PORT_IS_OUTPUT)
+        || !(dst->descriptor->flags & PORT_IS_INPUT))
         return IllegalConnection;
       
       // Only one connection is allowed for input ports
