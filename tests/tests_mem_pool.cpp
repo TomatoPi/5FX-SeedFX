@@ -7,19 +7,21 @@
 
 #define ERROR(fmt, ...) if(1) { fprintf(stderr, fmt, ##__VA_ARGS__); exit(EXIT_FAILURE); }
 
+using index_t = int16_t;
+
 const size_t objectsize = sizeof(float);
 const size_t poolsize = 16;
-const size_t memsize = sfx::alloc::pool_allocator_t::required_size(objectsize, poolsize);
+const size_t memsize = sfx::alloc::pool_allocator_t<index_t>::required_size(objectsize, poolsize);
 
 uint8_t memory[memsize] = {0};
 
-void dump_memory(const sfx::alloc::pool_allocator_t* alloc)
+void dump_memory(const sfx::alloc::pool_allocator_t<index_t>* alloc)
 {
   printf("\n===================\n");
   printf("Memory dump :\n\tObjsize : %lu\n\tPoolsize : %lu\n\tMemorySize : %lu\n", objectsize, poolsize, memsize);
 
   printf("Free slots :\n\t");
-  const int16_t* indexes = reinterpret_cast<int16_t*>(memory);
+  const index_t* indexes = reinterpret_cast<index_t*>(memory);
   for (int i=alloc->free_lst() ; i != -1 ; i = indexes[i])
     printf(" -> %d", i);
   printf(" -> -1\n");
@@ -40,7 +42,7 @@ int main(int argc, const char* argv[])
 {
   srand(0);
   
-  sfx::alloc::pool_allocator_t allocator{ memory, objectsize, poolsize };
+  sfx::alloc::pool_allocator_t<index_t> allocator{ memory, objectsize, poolsize };
   dump_memory(&allocator);
 
   void* ptr = allocator.alloc();

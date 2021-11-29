@@ -151,6 +151,18 @@ namespace sfx
         }
         return max;
       }
+      size_t total_available_size() const
+      {
+        size_t res = 0;
+        for (
+          memblock_desc_t* tmp = free_blocks_anchor.next;
+          tmp != nullptr;
+          tmp = tmp->next)
+        {
+          res += tmp->blocksize();
+        }
+        return res;
+      }
 
       const memblock_desc_t* freelst() const { return free_blocks_anchor.next; }
       const memblock_desc_t* alloclst() const { return occupied_blocks_anchor.next; }
@@ -167,6 +179,7 @@ namespace sfx
           if (size <= (*tmp)->blocksize())
             return tmp;
         }
+        out_of_memory(this, size, max_available_size());
         return nullptr;
       }
 

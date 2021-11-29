@@ -1,26 +1,10 @@
 #include "jack.hpp"
 
-#include "../alloc/object_pool_allocator.hpp"
 #include "../alloc/heterogenous_allocator.hpp"
 
 #include <stdlib.h>
 
 extern sfx::alloc::heterogenous_allocator_t* _main_allocator;
-
-namespace 
-{
-  sfx::alloc::pool_allocator_t<int8_t> _jack_modules_allocator;
-  sfx::alloc::pool_allocator_t<int8_t> _jack_ports_allocator;
-  sfx::alloc::pool_allocator_t<int8_t> _jack_connections_allocator;
-  sfx::alloc::pool_allocator_t<int8_t> _jack_buffers_allocator;
-
-  size_t _blocksize;
-
-  size_t _max_modules_count;
-  size_t _max_ports_count;
-  size_t _max_connections_count;
-  size_t _max_buffers_count;
-}
 
 namespace sfx
 {
@@ -30,7 +14,7 @@ namespace sfx
     namespace impl
     {
       template <typename pool_allocator_t>
-      result_e alloc_pool(pool_allocator_t* allocator, size_t objsize, size_t poolsize)
+      err_t alloc_pool(pool_allocator_t* allocator, size_t objsize, size_t poolsize)
       {
         size_t req_size = allocator->required_size(objsize, poolsize);
         uint8_t* memory = (uint8_t*) _main_allocator->alloc(req_size);
@@ -42,7 +26,7 @@ namespace sfx
       }
 
       template <typename pool_allocator_t>
-      result_e free_pool(pool_allocator_t* allocator)
+      err_t free_pool(pool_allocator_t* allocator)
       {
         if (nullptr != allocator->raw_memory())
           if (0 != _main_allocator->free(allocator->raw_memory()))
@@ -51,7 +35,7 @@ namespace sfx
         return Success;
       }
 
-      result_e realloc_buffers()
+      err_t realloc_buffers()
       {
         return Success;
       }
@@ -60,61 +44,61 @@ namespace sfx
 
     /// Methods
 
-    result_e init(size_t max_modules_count, size_t max_ports_count)
+    err_t engine::init(size_t max_modules_count, size_t max_ports_count)
     {
-      _blocksize = 0;
-      _max_modules_count = max_modules_count;
-      _max_ports_count = max_ports_count;
-      _max_connections_count = max_ports_count;
-      _max_buffers_count = _max_ports_count;
+      blocksize = 0;
+      this->max_modules_count = max_modules_count;
+      this->max_ports_count = max_ports_count;
+      max_connections_count = max_ports_count;
+      max_buffers_count = max_ports_count;
 
-      result_e err;
-      if ( (err = impl::alloc_pool(&_jack_modules_allocator, sizeof(module_t), _max_modules_count))
-        || (err = impl::alloc_pool(&_jack_ports_allocator, sizeof(port_t), _max_ports_count))
-        || (err = impl::alloc_pool(&_jack_connections_allocator, sizeof(connection_t), _max_connections_count))
-        || (err = impl::alloc_pool(&_jack_buffers_allocator, 0, 0))
+      err_t err;
+      if ( (err = impl::alloc_pool(&modules_allocator, sizeof(module_t), max_modules_count))
+        || (err = impl::alloc_pool(&ports_allocator, sizeof(port_t), max_ports_count))
+        || (err = impl::alloc_pool(&connections_allocator, sizeof(connection_t), max_connections_count))
+        || (err = impl::alloc_pool(&buffers_allocator, 0, 0))
         )
         return err;
       
       return Success;
     }
 
-    result_e deinint()
+    err_t engine::deinint()
     {
-      result_e err;
-      if ( (err = impl::free_pool(&_jack_modules_allocator))
-        || (err = impl::free_pool(&_jack_ports_allocator))
-        || (err = impl::free_pool(&_jack_connections_allocator))
-        || (err = impl::free_pool(&_jack_buffers_allocator)))
+      err_t err;
+      if ( (err = impl::free_pool(&modules_allocator))
+        || (err = impl::free_pool(&ports_allocator))
+        || (err = impl::free_pool(&connections_allocator))
+        || (err = impl::free_pool(&buffers_allocator)))
         return err;
       else
         return Success;
     }
 
-    result_e set_blocksize(size_t blocksize)
+    err_t engine::set_blocksize(size_t blocksize)
     {
-      _blocksize = blocksize;
+      blocksize = blocksize;
 
-      if (nullptr != _jack_buffers_allocator.raw_memory())
-        if (0 != _main_allocator->free(_jack_buffers_allocator.raw_memory()))
+      if (nullptr != buffers_allocator.raw_memory())
+        if (0 != _main_allocator->free(buffers_allocator.raw_memory()))
           return MemoryError;
 
-      result_e err;
-      if ((err = impl::alloc_pool(&_jack_buffers_allocator, sizeof(buffer_t) + blocksize, _max_buffers_count)))
+      err_t err;
+      if ((err = impl::alloc_pool(&buffers_allocator, sizeof(buffer_t) + blocksize, max_buffers_count)))
         return err;
 
       return impl::realloc_buffers();
     }
     
-    result_e recompute_process_graph()
+    err_t engine::recompute_process_graph()
     {
       // Meh, complex things here
       return Success;
     }
 
-    module_t* create_module(const module_descriptor_t* desc)
+    module_t* engine::create_module(const module_descriptor_t* desc)
     {
-      module_t* module = (module_t*) _jack_modules_allocator.alloc();
+      module_t* module = (module_t*) modules_allocator.alloc();
       if (nullptr == module)
         return nullptr;
       else
@@ -122,25 +106,25 @@ namespace sfx
         module->descriptor = desc;
         
         module->ports = nullptr;
-        module->uid = _jack_modules_allocator.indexof(module);
+        module->uid = modules_allocator.indexof(module);
         
         module->args = nullptr;
         return module;
       }
     }
-    result_e destroy_module(module_t* module)
+    err_t engine::destroy_module(module_t* module)
     {
       for (port_t* tmp = module->ports ; tmp != nullptr ; tmp = module->ports)
-        if (result_e err = destroy_port(tmp); Success != err)
+        if (err_t err = destroy_port(tmp); Success != err)
           return err;
-      if (0 != _jack_modules_allocator.free(module))
+      if (0 != modules_allocator.free(module))
         return MemoryError;
       return Success;
     }
 
-    port_t* create_port(module_t* module, const port_descriptor_t* desc)
+    port_t* engine::create_port(module_t* module, const port_descriptor_t* desc)
     {
-      port_t* port = (port_t*) _jack_ports_allocator.alloc();
+      port_t* port = (port_t*) ports_allocator.alloc();
       if (nullptr == port)
         return nullptr;
       else
@@ -149,7 +133,7 @@ namespace sfx
 
         port->buffer = nullptr;
         port->module = module;
-        port->uid = _jack_ports_allocator.indexof(port);
+        port->uid = ports_allocator.indexof(port);
 
         port->connections = nullptr;
         port_t** link;
@@ -160,7 +144,7 @@ namespace sfx
         return port;
       }
     }
-    result_e destroy_port(port_t* port)
+    err_t engine::destroy_port(port_t* port)
     {
       port_t** link;
       for (
@@ -172,15 +156,15 @@ namespace sfx
         return InvalidState;
 
       *link = port->next;
-      _jack_ports_allocator.free(port);
+      ports_allocator.free(port);
 
       return Success;
     }
 
-    result_e connect(port_id_t id_src, port_id_t id_dst)
+    err_t engine::connect(port_id_t id_src, port_id_t id_dst)
     {
-      port_t* src = (port_t*) _jack_ports_allocator.get(id_src);
-      port_t* dst = (port_t*) _jack_ports_allocator.get(id_dst);
+      port_t* src = (port_t*) ports_allocator.get(id_src);
+      port_t* dst = (port_t*) ports_allocator.get(id_dst);
       if (nullptr == src || nullptr == dst)
         return InvalidArguments;
 
@@ -202,7 +186,7 @@ namespace sfx
           return ExistingConnection;
 
       // Alloc a new handle and populate it
-      connection_t* newcon = (connection_t*) _jack_connections_allocator.alloc();
+      connection_t* newcon = (connection_t*) connections_allocator.alloc();
       if (nullptr == newcon)
         return OutOfMemory;
 
@@ -216,10 +200,10 @@ namespace sfx
         
       return Success;
     }
-    result_e disconnect(port_id_t id_src, port_id_t id_dst)
+    err_t engine::disconnect(port_id_t id_src, port_id_t id_dst)
     {
-      port_t* src = (port_t*) _jack_ports_allocator.get(id_src);
-      port_t* dst = (port_t*) _jack_ports_allocator.get(id_dst);
+      port_t* src = (port_t*) ports_allocator.get(id_src);
+      port_t* dst = (port_t*) ports_allocator.get(id_dst);
       if (nullptr == src || nullptr == dst)
         return InvalidArguments;
 
@@ -237,14 +221,14 @@ namespace sfx
       // remove the connection and free memory
       *tmp = conn->next;
       dst->connections = nullptr;
-      if (0 != _jack_connections_allocator.free(conn))
+      if (0 != connections_allocator.free(conn))
         return MemoryError;
 
       // done
       return Success;
     }
 
-    result_e process_callback(const float* const* physical_in, float** physical_out)
+    err_t engine::process_callback(const float* const* physical_in, float** physical_out)
     {
       // Call each modules of the process graph
       return Success;
