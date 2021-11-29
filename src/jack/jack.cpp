@@ -1,6 +1,7 @@
 #include "jack.hpp"
 
 #include "../alloc/heterogenous_allocator.hpp"
+#include "../alloc/dllist.hpp"
 
 #include <stdlib.h>
 
@@ -17,7 +18,7 @@ namespace sfx
       err_t alloc_pool(pool_allocator_t* allocator, size_t objsize, size_t poolsize)
       {
         size_t req_size = allocator->required_size(objsize, poolsize);
-        uint8_t* memory = (uint8_t*) _main_allocator->alloc(req_size);
+        uint8_t* memory = (uint8_t*)_main_allocator->alloc(req_size);
         if (nullptr == memory)
           return OutOfMemory;
 
@@ -29,16 +30,81 @@ namespace sfx
       err_t free_pool(pool_allocator_t* allocator)
       {
         if (nullptr != allocator->raw_memory())
-          if (0 != _main_allocator->free(allocator->raw_memory()))
-            return MemoryError;
+          if (0 != _main_allocator->free(allocator->raw_memory()))           {
+            snprintf(sfx::errstr, sfx::errstr_size, "Free failure at free_pool %p", allocator);
+            return (err_t)(sfx::errno = MemoryError);
+          }
         *allocator = pool_allocator_t(nullptr);
         return Success;
       }
 
-      err_t realloc_buffers()
+      struct graph_compute_helpers_t
       {
-        return Success;
-      }
+
+        using queue_t = sfx::utils::dllist_t<int8_t>;
+        using queue_allocator_t = sfx::alloc::pool_allocator_t<int8_t>;
+
+        int8_t* ranks;
+        int8_t rankmax;
+
+        queue_t queue;
+        queue_allocator_t qalloc;
+
+        graph_compute_helpers_t() :
+          ranks{ nullptr }, rankmax{ 0 }
+        {
+        }
+        ~graph_compute_helpers_t()
+        {
+          if (ranks)
+            _main_allocator->free(ranks);
+          if (qalloc.raw_memory())
+            free_pool(&qalloc);
+        }
+
+        err_t allocate(size_t max_modules_count, size_t nodes_pool_size)
+        {
+          ranks = (int8_t*)_main_allocator->alloc(max_modules_count * sizeof(int8_t));
+          if (nullptr == ranks)
+            return OutOfMemory;
+          for (size_t i = 0; i < max_modules_count; ++i)
+            ranks[i] = 0;
+
+          err_t err;
+          if (Success != (err = alloc_pool(&qalloc, sizeof(queue_t::node_t), nodes_pool_size)))
+            return OutOfMemory;
+
+          return Success;
+        }
+
+        err_t add_to_todo(int8_t module)
+        {
+          if (queue.begin() != queue.end() && queue.back() == module)
+            return Success;
+
+          queue_t::node_t* node = (queue_t::node_t*) qalloc.alloc();
+          if (nullptr == node)
+            return OutOfMemory;
+          
+          node->next = node->prev = node;
+          node->obj = module;
+
+          queue.push_back(node);
+
+          return Success;
+        }
+
+        void set_rank(int8_t* ptr, int8_t rank)
+        {
+          if (*ptr < rank)
+            *ptr = rank;
+        }
+        void set_rank(int8_t module, int8_t rank)
+        {
+          set_rank(ranks + module, rank);
+          set_rank(&rankmax, rank);
+        }
+      };
     }
     // namespace impl
 
@@ -53,68 +119,229 @@ namespace sfx
       max_buffers_count = max_ports_count;
 
       err_t err;
-      if ( (err = impl::alloc_pool(&modules_allocator, sizeof(module_t), max_modules_count))
+      if ((err = impl::alloc_pool(&modules_allocator, sizeof(module_t), max_modules_count))
         || (err = impl::alloc_pool(&ports_allocator, sizeof(port_t), max_ports_count))
         || (err = impl::alloc_pool(&connections_allocator, sizeof(connection_t), max_connections_count))
         || (err = impl::alloc_pool(&buffers_allocator, 0, 0))
         )
         return err;
-      
+
+      process_order = (int8_t*)_main_allocator->alloc(max_modules_count * sizeof(int8_t));
+      if (nullptr == process_order)
+        return OutOfMemory;
+      for (size_t i = 0; i < max_modules_count; ++i)
+        process_order[i] = -1;
+
       return Success;
     }
 
     err_t engine::deinint()
     {
       err_t err;
-      if ( (err = impl::free_pool(&modules_allocator))
+      if ((err = impl::free_pool(&modules_allocator))
         || (err = impl::free_pool(&ports_allocator))
         || (err = impl::free_pool(&connections_allocator))
         || (err = impl::free_pool(&buffers_allocator)))
         return err;
-      else
-        return Success;
+
+      if (process_order)
+        if (0 != _main_allocator->free(process_order))         {
+          snprintf(sfx::errstr, sfx::errstr_size, "Free failure at free rocess order");
+          return (err_t)(sfx::errno = MemoryError);
+        }
+
+      return Success;
     }
 
     err_t engine::set_blocksize(size_t blocksize)
     {
       blocksize = blocksize;
 
-      if (nullptr != buffers_allocator.raw_memory())
-        if (0 != _main_allocator->free(buffers_allocator.raw_memory()))
-          return MemoryError;
-
       err_t err;
+      if ((err = impl::free_pool(&buffers_allocator)))
+        return err;
       if ((err = impl::alloc_pool(&buffers_allocator, sizeof(buffer_t) + blocksize, max_buffers_count)))
         return err;
 
-      return impl::realloc_buffers();
+      return realloc_buffers();
     }
-    
+
+    err_t engine::realloc_buffers()
+    {
+      buffers_allocator.clear();
+      for (size_t i = 0; i < 4; ++i)
+        physical_buffers[i] = nullptr;
+
+      // Alloc one buffer for each output port
+      for (auto itr = ports_allocator.begin(); itr != ports_allocator.end(); ++itr)       {
+        port_t* port = itr.get<port_t>();
+
+        if (port->descriptor->flags & PORT_IS_OUTPUT || port->descriptor->flags & PORT_IS_PHYSICAL)         {
+          port->buffer = (buffer_t*)buffers_allocator.alloc();
+          if (nullptr == port->buffer)
+            return OutOfMemory;
+        }
+
+        if (port->descriptor->flags & PORT_IS_PHYSICAL)         {
+          buffer_t** pptr = &physical_buffers[port->descriptor->pid];
+          if (nullptr != *pptr)           {
+            snprintf(sfx::errstr, sfx::errstr_size, "Duplicated physical io");
+            return (err_t)(sfx::errno = InvalidState);
+          }
+          physical_buffers[port->descriptor->pid] = port->buffer;
+        }
+
+      }
+
+      // Then apply connections
+      for (auto itr = connections_allocator.begin(); itr != connections_allocator.end(); ++itr)
+        for (connection_t* con = itr.get<connection_t>(); con != nullptr; con = con->next)         {
+          port_t* src = (port_t*)ports_allocator.get(con->src);
+          port_t* dst = (port_t*)ports_allocator.get(con->dst);
+          if (dst->descriptor->flags & PORT_IS_PHYSICAL && dst->descriptor->flags & PORT_IS_INPUT)
+            src->buffer = dst->buffer;
+          else
+            dst->buffer = src->buffer;
+        }
+
+      return Success;
+    }
+
     err_t engine::recompute_process_graph()
     {
-      // Meh, complex things here
+      err_t err;
+      {
+        // List of rank for each module
+        size_t modules_count = modules_allocator.used_slots_count();
+        impl::graph_compute_helpers_t helpers;
+
+        if (Success != (err = helpers.allocate(max_modules_count, modules_count * 2)))
+          return err;
+
+        // Initialisation : fill the todo list with all modules
+        //  owning a physical output port
+        for (auto itr = ports_allocator.begin(); itr != ports_allocator.end(); ++itr)         {
+          const port_t* port = itr.get<port_t>();
+          if (port->descriptor->flags & PORT_IS_PHYSICAL)           {
+            if (port->descriptor->flags & PORT_IS_INPUT)             {
+              int8_t module_idx = port->module->uid;
+              if (Success != (err = helpers.add_to_todo(module_idx)))
+                return err;
+              helpers.set_rank(module_idx, 1);
+            }
+          }
+        }
+      
+        auto dump_status = [&](){
+          fprintf(stderr, "\n==================\nGraph Computation Dump\n");
+          for (auto itr = modules_allocator.begin(); itr != modules_allocator.end(); ++itr)
+          {
+            const module_t* m = itr.get<module_t>();
+            fprintf(stderr, "\tModule : %d : rank : %d\n", m->uid, helpers.ranks[m->uid]);
+          }
+          fprintf(stderr, "\tTODO List : ");
+          for (auto node = helpers.queue.begin(); node != helpers.queue.end(); node = node->next)
+          {
+            fprintf(stderr, "%d -> ", node->obj);
+          }
+          fprintf(stderr, "-1\n");
+
+          fprintf(stderr, "\tRankmax : %d\n", helpers.rankmax);
+
+          fprintf(stderr, "==================\n");
+        };
+
+        dump_status();
+
+        // Algorithm : while todo list not empty :
+        //  For each input port connected :
+        //    Add target module to the todo list
+        //    set it's rank to max(target rank, module rank + 1)
+        while (helpers.queue.begin() != helpers.queue.end())         {
+          auto node = helpers.queue.begin();
+          int8_t module_index = node->obj;
+          int8_t module_rank = helpers.ranks[module_index];
+
+          fprintf(stderr, "Processing Module %d ... ", module_index);
+
+          const module_t* module = (const module_t*)modules_allocator.get(module_index);
+
+          for (const port_t* port = module->ports; port != nullptr; port = port->next)
+            if (port->descriptor->flags & PORT_IS_INPUT)             {
+              const connection_t* con = port->connections;
+              if (nullptr == con)
+                continue;
+              const port_t* target = (const port_t*)ports_allocator.get(con->src);
+              int8_t target_index = target->module->uid;
+
+              if (Success != (err = helpers.add_to_todo(target_index)))
+                return err;
+
+              helpers.set_rank(target_index, module_rank + 1);
+            }
+          dump_status();
+          
+          node->extract();
+          if (0 != helpers.qalloc.free(node))           {
+            snprintf(sfx::errstr, sfx::errstr_size, "Free failure at free node");
+            return (err_t)(sfx::errno = MemoryError);
+          }
+
+          fprintf(stderr, "Done\n");
+          dump_status();
+        }
+
+        // Prepare final list
+        for (size_t i = 0; i < max_modules_count; ++i)
+          process_order[i] = -1;
+
+        // At this state each module was assignated a rank
+        //  giving a reverse order for processing
+        // So we will sort them to generate future queue
+        size_t cptr = 0;
+        for (int8_t rank = helpers.rankmax; 0 < rank; --rank)
+          for (auto itr = modules_allocator.begin(); itr != modules_allocator.end(); ++itr)           {
+            const module_t* module = itr.get<module_t>();
+            int8_t module_rank = helpers.ranks[module->uid];
+            if (rank == module_rank)             {
+              process_order[cptr] = module->uid;
+              cptr += 1;
+            }
+          }
+        if (modules_count < cptr)         {
+          snprintf(sfx::errstr, sfx::errstr_size, "Graph algorithm failure");
+          return (err_t)(sfx::errno = InvalidState);
+        }
+
+        // Null terminate the list
+        if (cptr < max_modules_count)
+          process_order[cptr] = -1;
+
+        if (Success != (err = realloc_buffers()))
+          return err;
+      }
+      _main_allocator->optimize_memory();
       return Success;
     }
 
     module_t* engine::create_module(const module_descriptor_t* desc)
     {
-      module_t* module = (module_t*) modules_allocator.alloc();
+      module_t* module = (module_t*)modules_allocator.alloc();
       if (nullptr == module)
         return nullptr;
-      else
-      {
+      else       {
         module->descriptor = desc;
-        
+
         module->ports = nullptr;
         module->uid = modules_allocator.indexof(module);
-        
+
         module->args = nullptr;
         return module;
       }
     }
     err_t engine::destroy_module(module_t* module)
     {
-      for (port_t* tmp = module->ports ; tmp != nullptr ; tmp = module->ports)
+      for (port_t* tmp = module->ports; tmp != nullptr; tmp = module->ports)
         if (err_t err = destroy_port(tmp); Success != err)
           return err;
       if (0 != modules_allocator.free(module))
@@ -124,11 +351,10 @@ namespace sfx
 
     port_t* engine::create_port(module_t* module, const port_descriptor_t* desc)
     {
-      port_t* port = (port_t*) ports_allocator.alloc();
+      port_t* port = (port_t*)ports_allocator.alloc();
       if (nullptr == port)
         return nullptr;
-      else
-      {
+      else       {
         port->descriptor = desc;
 
         port->buffer = nullptr;
@@ -137,8 +363,8 @@ namespace sfx
 
         port->connections = nullptr;
         port_t** link;
-        for (link = &(module->ports) ; *link != nullptr ; link = &((*link)->next))
-          { /* empty body */ }
+        for (link = &(module->ports); *link != nullptr; link = &((*link)->next))           { /* empty body */
+        }
         *link = port;
 
         return port;
@@ -148,10 +374,10 @@ namespace sfx
     {
       port_t** link;
       for (
-        link = &(port->module->ports) ;
-        *link != port && *link != nullptr ;
-        link = &((*link)->next))
-      { /* empty body */ }
+        link = &(port->module->ports);
+        *link != port && *link != nullptr;
+        link = &((*link)->next))       { /* empty body */
+      }
       if (nullptr == *link)
         return InvalidState;
 
@@ -163,30 +389,30 @@ namespace sfx
 
     err_t engine::connect(port_id_t id_src, port_id_t id_dst)
     {
-      port_t* src = (port_t*) ports_allocator.get(id_src);
-      port_t* dst = (port_t*) ports_allocator.get(id_dst);
+      port_t* src = (port_t*)ports_allocator.get(id_src);
+      port_t* dst = (port_t*)ports_allocator.get(id_dst);
       if (nullptr == src || nullptr == dst)
         return InvalidArguments;
 
-      if ((src->descriptor->flags & PORT_IS_PHYSICAL) 
+      if ((src->descriptor->flags & PORT_IS_PHYSICAL)
         && (dst->descriptor->flags & PORT_IS_PHYSICAL))
         return IllegalConnection;
       if (!(src->descriptor->flags & PORT_IS_OUTPUT)
         || !(dst->descriptor->flags & PORT_IS_INPUT))
         return IllegalConnection;
-      
+
       // Only one connection is allowed for input ports
       if (nullptr != dst->connections)
         return InputPortAlreadyConnected;
-      
+
       // Avoid duplicate connections
       connection_t** tmp;
-      for (tmp = &src->connections ; *tmp != nullptr ; tmp = &(*tmp)->next)
+      for (tmp = &src->connections; *tmp != nullptr; tmp = &(*tmp)->next)
         if ((*tmp)->dst == id_dst)
           return ExistingConnection;
 
       // Alloc a new handle and populate it
-      connection_t* newcon = (connection_t*) connections_allocator.alloc();
+      connection_t* newcon = (connection_t*)connections_allocator.alloc();
       if (nullptr == newcon)
         return OutOfMemory;
 
@@ -197,13 +423,13 @@ namespace sfx
       // Append the connection at the end of linked list
       *tmp = newcon;
       dst->connections = newcon;
-        
+
       return Success;
     }
     err_t engine::disconnect(port_id_t id_src, port_id_t id_dst)
     {
-      port_t* src = (port_t*) ports_allocator.get(id_src);
-      port_t* dst = (port_t*) ports_allocator.get(id_dst);
+      port_t* src = (port_t*)ports_allocator.get(id_src);
+      port_t* dst = (port_t*)ports_allocator.get(id_dst);
       if (nullptr == src || nullptr == dst)
         return InvalidArguments;
 
@@ -213,16 +439,18 @@ namespace sfx
 
       // Search for the connection in src's list
       connection_t** tmp;
-      for (tmp = &src->connections ; *tmp != nullptr && *tmp != conn ; tmp = &(*tmp)->next)
-        { /* empty loop body */ }
+      for (tmp = &src->connections; *tmp != nullptr && *tmp != conn; tmp = &(*tmp)->next)         { /* empty loop body */
+      }
       if (nullptr == *tmp)
         return InvalidState; // Holly shit ... connections linked list is broken ...
 
       // remove the connection and free memory
       *tmp = conn->next;
       dst->connections = nullptr;
-      if (0 != connections_allocator.free(conn))
-        return MemoryError;
+      if (0 != connections_allocator.free(conn))       {
+        snprintf(sfx::errstr, sfx::errstr_size, "Free failure at disconnect");
+        return (err_t)(sfx::errno = MemoryError);
+      }
 
       // done
       return Success;
@@ -230,7 +458,21 @@ namespace sfx
 
     err_t engine::process_callback(const float* const* physical_in, float** physical_out)
     {
+      // Fill physical buffers
+      float* pio[4] = { const_cast<float*>(physical_in[0]), const_cast<float*>(physical_in[1]),physical_out[0], physical_out[1] };
+      for (size_t i = 0; i < 4; ++i)
+        if (physical_buffers[i])
+          physical_buffers[i]->samples = pio[i];
+
       // Call each modules of the process graph
+      for (size_t i = 0; i < max_modules_count && process_order[i] != 0; ++i)       {
+        module_t* module = (module_t*)modules_allocator.get(i);
+        int err;
+        if (0 != (err = module->descriptor->callback(module)))         {
+          snprintf(sfx::errstr, sfx::errstr_size, "Module %d failed : code %d", module->uid, err);
+          return (err_t)(sfx::errno = ModuleProcessFailed);
+        }
+      }
       return Success;
     }
   }

@@ -47,6 +47,7 @@ namespace sfx
         descriptors[idx].next_idx = occupied_slots_anchor.next_idx;
         occupied_slots_anchor.next_idx = idx;
         // done
+        fprintf(stderr, "Allocated %lu bytes at %p in pool %p\n", objectsize, newptr, this);
         return newptr;
       }
 
@@ -109,6 +110,24 @@ namespace sfx
         return index < poolsize ? objects + (index * objectsize) : nullptr;
       }
 
+      size_t free_slots_count() const
+      {
+        return poolsize - used_slots_count();
+      }
+
+      size_t used_slots_count() const
+      {
+        size_t count = 0;
+        // find the node pointing to target object
+        for (
+          index_t idx = occupied_slots_anchor.next_idx;
+          -1 != idx;
+          idx = descriptors[idx].next_idx)
+        {
+          count += 1;
+        }
+        return count;
+      }
 
       struct iterator {
         pool_allocator_t* allocator;
@@ -134,9 +153,13 @@ namespace sfx
         {
           return a.allocator == b.allocator && a.index == b.index;
         }
+        friend bool operator!= (const iterator& a, const iterator& b)
+        {
+          return a.allocator != b.allocator || a.index != b.index;
+        }
       };
 
-      iterator begin() { return { this, occupied_slots_anchor.next_index }; }
+      iterator begin() { return { this, occupied_slots_anchor.next_idx }; }
       iterator end() { return { this, -1 }; }
 
     private:

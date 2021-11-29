@@ -23,10 +23,18 @@ namespace sfx
       PORT_IS_TERMINAL  = 0x04,
       PORT_IS_PHYSICAL  = 0x08,
     };
+
+    enum physical_port_t {
+      PhysicalIn0,
+      PhysicalIn1,
+      PhysicalOut0,
+      PhysicalOut1,
+    };
   
     struct port_descriptor_t {
       const char* name;
       int flags;
+      physical_port_t pid;
     };
 
     struct module_descriptor_t {

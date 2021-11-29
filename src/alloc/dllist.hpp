@@ -5,10 +5,12 @@ namespace sfx
   namespace utils
   {
     /// Double linked anchored list
+    template <typename T>
     class dllist_t {
     public :
+
       struct node_t {
-        node_t(void* obj = nullptr) : 
+        node_t(T obj = T()) : 
           obj{obj}, next{this}, prev{this} {}
 
         void extract()
@@ -17,19 +19,43 @@ namespace sfx
           prev->next = next;
           next = prev = this;
         }
+        static void insert_before(node_t* node, node_t* other)
+        {
+          node->next = other;
+          node->prev = other->prev;
+          other->prev->next = node;
+          other->prev = node;
+        }
 
-        void* obj;
+        T obj;
         node_t* next;
         node_t* prev;
       };
 
-      void add(node_t* node)
+      dllist_t() { anchor.next = anchor.prev = &anchor; }
+
+      void push_back(node_t* node)
       {
-        node->next = &anchor;
-        node->prev = anchor.prev;
-        anchor.prev->next = node;
-        anchor.prev = node;
+        node_t::insert_before(node, end());
       }
+      void push_front(node_t* node)
+      {
+        node_t::insert_before(node, begin());
+      }
+
+      node_t* find(const T& obj)
+      {
+        for (node_t* node = begin(); node != end(); node = node->next)
+          if (node->obj == obj)
+            return node;
+        return nullptr;
+      }
+
+      T& front() { return begin()->obj; }
+      const T& front() const { return begin()->obj; }
+
+      T& back() { return end()->prev->obj; }
+      const T& back() const { return end()->prev->obj; }
 
       node_t* begin() { return anchor.next; }
       const node_t* begin() const { return anchor.next; }

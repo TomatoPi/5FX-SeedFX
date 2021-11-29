@@ -24,13 +24,16 @@ namespace sfx
       size_t max_connections_count;
       size_t max_buffers_count;
 
+      int8_t* process_order;
+      buffer_t* physical_buffers[4]; // Phy in0 in1 out0 out1
+
     public :
 
       err_t init(size_t max_modules_count, size_t max_ports_count);
       err_t deinint();
 
       err_t set_blocksize(size_t blocksize);
-      
+      err_t realloc_buffers();
       err_t recompute_process_graph();
 
       module_t* create_module(const module_descriptor_t* desc);

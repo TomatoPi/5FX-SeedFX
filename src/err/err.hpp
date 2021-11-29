@@ -23,6 +23,8 @@ namespace sfx
     ExistingConnection,
 
     PortsNotConnected,
+
+    ModuleProcessFailed,
   };
 
   const char* errname(err_t err);

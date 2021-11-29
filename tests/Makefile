@@ -1,4 +1,4 @@
-CXXFLAGS=-Wall -I../src
+CXXFLAGS=-Wall -I../src -g
 
 all:
 	make tests_mem_hetero

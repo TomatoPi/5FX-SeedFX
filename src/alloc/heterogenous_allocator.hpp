@@ -66,6 +66,7 @@ namespace sfx
           free_blocks_anchor.next = garbage;
         }
 
+        fprintf(stderr, "Allocated %lu bytes in memblock %p\n", size, this);
         // return ptr to allocated memory
         return newblock->memblock();
       }
