@@ -1,6 +1,12 @@
 #pragma once
 
 #include <stddef.h>
+#include <stdio.h>
+
+#define RETURN_ERROR(errcode, fmt, ...) { \
+  snprintf(::sfx::errstr, ::sfx::errstr_size, fmt, ##__VA_ARGS__); \
+  return (::sfx::err_t)(::sfx::errno = errcode); \
+}
 
 namespace sfx
 {

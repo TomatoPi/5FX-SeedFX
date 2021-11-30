@@ -11,17 +11,19 @@ namespace sfx
 
     struct module_t;
 
-    using port_id_t = int8_t;
+    using port_id_t   = int8_t;
     using module_id_t = int8_t;
+    using connection_id_t = int8_t;
+    using buffer_id_t = int8_t;
 
     /// Descriptors, used to tell jack what is what
 
     enum port_flags_e {
-      PORT_NONE         = 0x00,
-      PORT_IS_INPUT     = 0x01,
-      PORT_IS_OUTPUT    = 0x02,
-      PORT_IS_TERMINAL  = 0x04,
-      PORT_IS_PHYSICAL  = 0x08,
+      PortNull        = 0x00,
+      PortIsInput     = 0x01,
+      PortIsOutput    = 0x02,
+      PortIsTerminal  = 0x04,
+      PortIsPhysical  = 0x08,
     };
 
     enum physical_port_t {

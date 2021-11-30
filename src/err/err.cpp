@@ -10,6 +10,7 @@ namespace sfx
     switch (err)
     {
       case Success : return "Success";
+      case Failure : return "Failure";
 
       case OutOfMemory : return "OutOfMemory";
       case MemoryError : return "MemoryError";
@@ -22,6 +23,8 @@ namespace sfx
       case ExistingConnection : return "ExistingConnection";
       
       case PortsNotConnected : return "PortsNotConnected";
+
+      case ModuleProcessFailed : return "ModuleProcessFailed";
 
       default : return "Unkown Error";
     }

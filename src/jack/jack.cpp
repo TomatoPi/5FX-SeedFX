@@ -41,7 +41,7 @@ namespace sfx
       struct graph_compute_helpers_t
       {
 
-        using queue_t = sfx::utils::dllist_t<int8_t>;
+        using queue_t = sfx::utils::dllist_t<module_id_t>;
         using queue_allocator_t = sfx::alloc::pool_allocator_t<int8_t>;
 
         int8_t* ranks;
@@ -77,7 +77,7 @@ namespace sfx
           return Success;
         }
 
-        err_t add_to_todo(int8_t module)
+        err_t add_to_todo(module_id_t module)
         {
           if (queue.begin() != queue.end() && queue.back() == module)
             return Success;
@@ -99,7 +99,7 @@ namespace sfx
           if (*ptr < rank)
             *ptr = rank;
         }
-        void set_rank(int8_t module, int8_t rank)
+        void set_rank(module_id_t module, int8_t rank)
         {
           set_rank(ranks + module, rank);
           set_rank(&rankmax, rank);
@@ -126,7 +126,7 @@ namespace sfx
         )
         return err;
 
-      process_order = (int8_t*)_main_allocator->alloc(max_modules_count * sizeof(int8_t));
+      process_order = (module_id_t*)_main_allocator->alloc(max_modules_count * sizeof(module_id_t));
       if (nullptr == process_order)
         return OutOfMemory;
       for (size_t i = 0; i < max_modules_count; ++i)
@@ -174,13 +174,13 @@ namespace sfx
       for (auto itr = ports_allocator.begin(); itr != ports_allocator.end(); ++itr)       {
         port_t* port = itr.get<port_t>();
 
-        if (port->descriptor->flags & PORT_IS_PHYSICAL)
+        if (port->descriptor->flags & PortIsPhysical)
         {
           port->buffer = &physical_buffers[port->descriptor->pid];
           continue;
         }
 
-        if (port->descriptor->flags & PORT_IS_OUTPUT)
+        if (port->descriptor->flags & PortIsOutput)
         {
           uint8_t* rawmem = (uint8_t*) buffers_allocator.alloc();
           if (nullptr == rawmem)
@@ -196,7 +196,7 @@ namespace sfx
         for (connection_t* con = itr.get<connection_t>(); con != nullptr; con = con->next)         {
           port_t* src = (port_t*)ports_allocator.get(con->src);
           port_t* dst = (port_t*)ports_allocator.get(con->dst);
-          if (dst->descriptor->flags & PORT_IS_PHYSICAL && dst->descriptor->flags & PORT_IS_INPUT)
+          if (dst->descriptor->flags & PortIsPhysical && dst->descriptor->flags & PortIsInput)
             src->buffer = dst->buffer;
           else
             dst->buffer = src->buffer;
@@ -220,9 +220,9 @@ namespace sfx
         //  owning a physical output port
         for (auto itr = ports_allocator.begin(); itr != ports_allocator.end(); ++itr)         {
           const port_t* port = itr.get<port_t>();
-          if (port->descriptor->flags & PORT_IS_PHYSICAL)           {
-            if (port->descriptor->flags & PORT_IS_INPUT)             {
-              int8_t module_idx = port->module->uid;
+          if (port->descriptor->flags & PortIsPhysical)           {
+            if (port->descriptor->flags & PortIsInput)             {
+              module_id_t module_idx = port->module->uid;
               if (Success != (err = helpers.add_to_todo(module_idx)))
                 return err;
               helpers.set_rank(module_idx, 1);
@@ -257,7 +257,7 @@ namespace sfx
         //    set it's rank to max(target rank, module rank + 1)
         while (helpers.queue.begin() != helpers.queue.end())         {
           auto node = helpers.queue.begin();
-          int8_t module_index = node->obj;
+          module_id_t module_index = node->obj;
           int8_t module_rank = helpers.ranks[module_index];
 
           if (max_modules_count < (size_t)helpers.rankmax)
@@ -271,12 +271,12 @@ namespace sfx
           const module_t* module = (const module_t*)modules_allocator.get(module_index);
 
           for (const port_t* port = module->ports; port != nullptr; port = port->next)
-            if (port->descriptor->flags & PORT_IS_INPUT)             {
+            if (port->descriptor->flags & PortIsInput)             {
               const connection_t* con = port->connections;
               if (nullptr == con)
                 continue;
               const port_t* target = (const port_t*)ports_allocator.get(con->src);
-              int8_t target_index = target->module->uid;
+              module_id_t target_index = target->module->uid;
 
               if (Success != (err = helpers.add_to_todo(target_index)))
                 return err;
@@ -391,18 +391,16 @@ namespace sfx
       return Success;
     }
 
-    err_t engine::connect(port_id_t id_src, port_id_t id_dst)
+    err_t engine::connect(port_t* src, port_t* dst)
     {
-      port_t* src = (port_t*)ports_allocator.get(id_src);
-      port_t* dst = (port_t*)ports_allocator.get(id_dst);
       if (nullptr == src || nullptr == dst)
         return InvalidArguments;
 
-      if ((src->descriptor->flags & PORT_IS_PHYSICAL)
-        && (dst->descriptor->flags & PORT_IS_PHYSICAL))
+      if ((src->descriptor->flags & PortIsPhysical)
+        && (dst->descriptor->flags & PortIsPhysical))
         return IllegalConnection;
-      if (!(src->descriptor->flags & PORT_IS_OUTPUT)
-        || !(dst->descriptor->flags & PORT_IS_INPUT))
+      if (!(src->descriptor->flags & PortIsOutput)
+        || !(dst->descriptor->flags & PortIsInput))
         return IllegalConnection;
 
       // Only one connection is allowed for input ports
@@ -412,7 +410,7 @@ namespace sfx
       // Avoid duplicate connections
       connection_t** tmp;
       for (tmp = &src->connections; *tmp != nullptr; tmp = &(*tmp)->next)
-        if ((*tmp)->dst == id_dst)
+        if ((*tmp)->dst == src->uid)
           return ExistingConnection;
 
       // Alloc a new handle and populate it
@@ -420,8 +418,8 @@ namespace sfx
       if (nullptr == newcon)
         return OutOfMemory;
 
-      newcon->src = id_src;
-      newcon->dst = id_dst;
+      newcon->src = src->uid;
+      newcon->dst = dst->uid;
       newcon->next = nullptr;
 
       // Append the connection at the end of linked list
@@ -430,15 +428,13 @@ namespace sfx
 
       return Success;
     }
-    err_t engine::disconnect(port_id_t id_src, port_id_t id_dst)
+    err_t engine::disconnect(port_t* src, port_t* dst)
     {
-      port_t* src = (port_t*)ports_allocator.get(id_src);
-      port_t* dst = (port_t*)ports_allocator.get(id_dst);
       if (nullptr == src || nullptr == dst)
         return InvalidArguments;
 
       connection_t* conn = dst->connections;
-      if (nullptr == conn || conn->src != id_src || conn->dst != id_dst)
+      if (nullptr == conn || conn->src != src->uid || conn->dst != dst->uid)
         return PortsNotConnected;
 
       // Search for the connection in src's list
@@ -451,10 +447,8 @@ namespace sfx
       // remove the connection and free memory
       *tmp = conn->next;
       dst->connections = nullptr;
-      if (0 != connections_allocator.free(conn))       {
-        snprintf(sfx::errstr, sfx::errstr_size, "Free failure at disconnect");
-        return (err_t)(sfx::errno = MemoryError);
-      }
+      if (0 != connections_allocator.free(conn))
+        RETURN_ERROR(MemoryError, "Free failure at disconnect");
 
       // done
       return Success;
@@ -472,10 +466,8 @@ namespace sfx
       {
         module_t* module = (module_t*)modules_allocator.get(process_order[i]);
         int err;
-        if (0 != (err = module->descriptor->callback(module)))         {
-          snprintf(sfx::errstr, sfx::errstr_size, "Module %d failed : code %d", module->uid, err);
-          return (err_t)(sfx::errno = ModuleProcessFailed);
-        }
+        if (0 != (err = module->descriptor->callback(module)))
+          RETURN_ERROR(ModuleProcessFailed, "Module %d failed : code %d", module->uid, err);
       }
       return Success;
     }

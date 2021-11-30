@@ -29,7 +29,7 @@
     exit(EXIT_FAILURE); \
   }
 
-#define CONNECT(a, b) TRY_JACK(jack.connect(a->uid, b->uid))
+#define CONNECT(a, b) TRY_JACK(jack.connect(a, b))
 
 sfx::alloc::heterogenous_allocator_t* _main_allocator;
 
@@ -117,16 +117,16 @@ int main(int argc, char * const argv[])
 
   sfx::jack::module_descriptor_t mod_desc = {"ModulePouet", callback_pourrite};
 
-  sfx::jack::port_descriptor_t phy_in_0_desc = {"PhyIn0", sfx::jack::PORT_IS_OUTPUT | sfx::jack::PORT_IS_PHYSICAL, sfx::jack::PhysicalIn0};
-  sfx::jack::port_descriptor_t phy_in_1_desc = {"PhyIn1", sfx::jack::PORT_IS_OUTPUT | sfx::jack::PORT_IS_PHYSICAL, sfx::jack::PhysicalIn1};
+  sfx::jack::port_descriptor_t phy_in_0_desc = {"PhyIn0", sfx::jack::PortIsOutput | sfx::jack::PortIsPhysical, sfx::jack::PhysicalIn0};
+  sfx::jack::port_descriptor_t phy_in_1_desc = {"PhyIn1", sfx::jack::PortIsOutput | sfx::jack::PortIsPhysical, sfx::jack::PhysicalIn1};
 
-  sfx::jack::port_descriptor_t phy_out_0_desc = {"PhyOut0", sfx::jack::PORT_IS_INPUT | sfx::jack::PORT_IS_PHYSICAL, sfx::jack::PhysicalOut0};
-  sfx::jack::port_descriptor_t phy_out_1_desc = {"PhyOut1", sfx::jack::PORT_IS_INPUT | sfx::jack::PORT_IS_PHYSICAL, sfx::jack::PhysicalOut1};
+  sfx::jack::port_descriptor_t phy_out_0_desc = {"PhyOut0", sfx::jack::PortIsInput | sfx::jack::PortIsPhysical, sfx::jack::PhysicalOut0};
+  sfx::jack::port_descriptor_t phy_out_1_desc = {"PhyOut1", sfx::jack::PortIsInput | sfx::jack::PortIsPhysical, sfx::jack::PhysicalOut1};
   
-  sfx::jack::port_descriptor_t in_0_desc = {"In0", sfx::jack::PORT_IS_INPUT};
-  sfx::jack::port_descriptor_t in_1_desc = {"In1", sfx::jack::PORT_IS_INPUT};
-  sfx::jack::port_descriptor_t out_0_desc = {"Out0", sfx::jack::PORT_IS_OUTPUT};
-  sfx::jack::port_descriptor_t out_1_desc = {"Out1", sfx::jack::PORT_IS_OUTPUT};
+  sfx::jack::port_descriptor_t in_0_desc = {"In0", sfx::jack::PortIsInput};
+  sfx::jack::port_descriptor_t in_1_desc = {"In1", sfx::jack::PortIsInput};
+  sfx::jack::port_descriptor_t out_0_desc = {"Out0", sfx::jack::PortIsOutput};
+  sfx::jack::port_descriptor_t out_1_desc = {"Out1", sfx::jack::PortIsOutput};
 
   CREATE_MODULE(m0, mod_desc);
   CREATE_PORT(pA, m0, phy_out_0_desc);
