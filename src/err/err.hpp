@@ -11,6 +11,7 @@ namespace sfx
 
   enum err_t {
     Success = 0,
+    Failure,
 
     OutOfMemory,
     MemoryError,

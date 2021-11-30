@@ -25,7 +25,7 @@ namespace sfx
       size_t max_buffers_count;
 
       int8_t* process_order;
-      buffer_t* physical_buffers[4]; // Phy in0 in1 out0 out1
+      buffer_t physical_buffers[4]; // Phy in0 in1 out0 out1
 
     public :
 

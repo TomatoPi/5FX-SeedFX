@@ -169,28 +169,26 @@ namespace sfx
     err_t engine::realloc_buffers()
     {
       buffers_allocator.clear();
-      for (size_t i = 0; i < 4; ++i)
-        physical_buffers[i] = nullptr;
 
       // Alloc one buffer for each output port
       for (auto itr = ports_allocator.begin(); itr != ports_allocator.end(); ++itr)       {
         port_t* port = itr.get<port_t>();
 
-        if (port->descriptor->flags & PORT_IS_OUTPUT || port->descriptor->flags & PORT_IS_PHYSICAL)         {
-          port->buffer = (buffer_t*)buffers_allocator.alloc();
-          if (nullptr == port->buffer)
+        if (port->descriptor->flags & PORT_IS_PHYSICAL)
+        {
+          port->buffer = &physical_buffers[port->descriptor->pid];
+          continue;
+        }
+
+        if (port->descriptor->flags & PORT_IS_OUTPUT)
+        {
+          uint8_t* rawmem = (uint8_t*) buffers_allocator.alloc();
+          if (nullptr == rawmem)
             return OutOfMemory;
-        }
 
-        if (port->descriptor->flags & PORT_IS_PHYSICAL)         {
-          buffer_t** pptr = &physical_buffers[port->descriptor->pid];
-          if (nullptr != *pptr)           {
-            snprintf(sfx::errstr, sfx::errstr_size, "Duplicated physical io");
-            return (err_t)(sfx::errno = InvalidState);
-          }
-          physical_buffers[port->descriptor->pid] = port->buffer;
+          port->buffer = (buffer_t*) rawmem;
+          port->buffer->samples = (float*) &rawmem[sizeof(buffer_t)];
         }
-
       }
 
       // Then apply connections
@@ -261,6 +259,12 @@ namespace sfx
           auto node = helpers.queue.begin();
           int8_t module_index = node->obj;
           int8_t module_rank = helpers.ranks[module_index];
+
+          if (max_modules_count < (size_t)helpers.rankmax)
+          {
+            snprintf(sfx::errstr, sfx::errstr_size, "Graph computation failure, rankmax overflow");
+            return (err_t)(sfx::errno = Failure);
+          }
 
           fprintf(stderr, "Processing Module %d ... ", module_index);
 
@@ -461,12 +465,12 @@ namespace sfx
       // Fill physical buffers
       float* pio[4] = { const_cast<float*>(physical_in[0]), const_cast<float*>(physical_in[1]),physical_out[0], physical_out[1] };
       for (size_t i = 0; i < 4; ++i)
-        if (physical_buffers[i])
-          physical_buffers[i]->samples = pio[i];
+          physical_buffers[i].samples = pio[i];
 
       // Call each modules of the process graph
-      for (size_t i = 0; i < max_modules_count && process_order[i] != 0; ++i)       {
-        module_t* module = (module_t*)modules_allocator.get(i);
+      for (size_t i = 0; i < max_modules_count && process_order[i] != -1; ++i)
+      {
+        module_t* module = (module_t*)modules_allocator.get(process_order[i]);
         int err;
         if (0 != (err = module->descriptor->callback(module)))         {
           snprintf(sfx::errstr, sfx::errstr_size, "Module %d failed : code %d", module->uid, err);

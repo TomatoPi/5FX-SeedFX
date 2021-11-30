@@ -29,6 +29,8 @@
     exit(EXIT_FAILURE); \
   }
 
+#define CONNECT(a, b) TRY_JACK(jack.connect(a->uid, b->uid))
+
 sfx::alloc::heterogenous_allocator_t* _main_allocator;
 
 constexpr const size_t _main_mem_size = 1U << 15;
@@ -51,10 +53,16 @@ void dump_connection(const sfx::jack::connection_t* c)
 {
   fprintf(stderr, "\t\t\t\tConnection : %d -> %d\n", c->src, c->dst);
 }
+void dump_buffer(const sfx::jack::buffer_t* b)
+{
+  if (b)
+    fprintf(stderr, "\t\t\t\t\tSamples : %p\n", b->samples);
+}
 void dump_port(const sfx::jack::port_t* p)
 {
   fprintf(stderr, "\t\t\tPort : %d : %p\n", p->uid, p);
   fprintf(stderr, "\t\t\t\tBuffer : %p\n", p->buffer);
+  dump_buffer(p->buffer);
   for (const sfx::jack::connection_t* con = p->connections; con != nullptr; con = con->next)
     dump_connection(con);
 }
@@ -91,6 +99,8 @@ void dump_engine(sfx::jack::engine* jack)
 
 int callback_pourrite(sfx::jack::module_t* mod)
 {
+  fprintf(stderr, "Callback for module %d\n", mod->uid);
+
   return 0;
 }
 
@@ -105,29 +115,47 @@ int main(int argc, char * const argv[])
   TRY_JACK(jack.set_blocksize(_block_size));
   print_occupancy();
 
-  sfx::jack::module_descriptor_t desc0 = {
-    "ModulePouet", callback_pourrite
-  };
-  sfx::jack::port_descriptor_t pdesc00 = {"PhyIn0", sfx::jack::PORT_IS_OUTPUT | sfx::jack::PORT_IS_PHYSICAL, sfx::jack::PhysicalIn0};
+  sfx::jack::module_descriptor_t mod_desc = {"ModulePouet", callback_pourrite};
+
+  sfx::jack::port_descriptor_t phy_in_0_desc = {"PhyIn0", sfx::jack::PORT_IS_OUTPUT | sfx::jack::PORT_IS_PHYSICAL, sfx::jack::PhysicalIn0};
+  sfx::jack::port_descriptor_t phy_in_1_desc = {"PhyIn1", sfx::jack::PORT_IS_OUTPUT | sfx::jack::PORT_IS_PHYSICAL, sfx::jack::PhysicalIn1};
+
+  sfx::jack::port_descriptor_t phy_out_0_desc = {"PhyOut0", sfx::jack::PORT_IS_INPUT | sfx::jack::PORT_IS_PHYSICAL, sfx::jack::PhysicalOut0};
+  sfx::jack::port_descriptor_t phy_out_1_desc = {"PhyOut1", sfx::jack::PORT_IS_INPUT | sfx::jack::PORT_IS_PHYSICAL, sfx::jack::PhysicalOut1};
   
-  CREATE_MODULE(m0, desc0);
-  CREATE_PORT(p0, m0, pdesc00);
+  sfx::jack::port_descriptor_t in_0_desc = {"In0", sfx::jack::PORT_IS_INPUT};
+  sfx::jack::port_descriptor_t in_1_desc = {"In1", sfx::jack::PORT_IS_INPUT};
+  sfx::jack::port_descriptor_t out_0_desc = {"Out0", sfx::jack::PORT_IS_OUTPUT};
+  sfx::jack::port_descriptor_t out_1_desc = {"Out1", sfx::jack::PORT_IS_OUTPUT};
 
-  sfx::jack::module_descriptor_t desc1 = {"ModuleToto", callback_pourrite};
-  sfx::jack::port_descriptor_t pdesc10 = {"In0", sfx::jack::PORT_IS_INPUT};
-  sfx::jack::port_descriptor_t pdesc11 = {"Out0", sfx::jack::PORT_IS_OUTPUT};
+  CREATE_MODULE(m0, mod_desc);
+  CREATE_PORT(pA, m0, phy_out_0_desc);
+  CREATE_PORT(pB, m0, phy_out_1_desc);
 
-  CREATE_MODULE(m1, desc1);
-  CREATE_PORT(p1, m1, pdesc10);
-  CREATE_PORT(p2, m1, pdesc11);
+  CREATE_MODULE(m0b, mod_desc);
+  CREATE_PORT(pC, m0b, phy_in_0_desc);
 
-  sfx::jack::module_descriptor_t desc2 = {"ModuleTiti", callback_pourrite};
-  sfx::jack::port_descriptor_t pdesc20 = {"PhyOut0", sfx::jack::PORT_IS_INPUT | sfx::jack::PORT_IS_PHYSICAL, sfx::jack::PhysicalOut0};
-  sfx::jack::port_descriptor_t pdesc21 = {"PhyOut1", sfx::jack::PORT_IS_INPUT | sfx::jack::PORT_IS_PHYSICAL, sfx::jack::PhysicalOut1};
+  CREATE_MODULE(m1, mod_desc);
+  CREATE_PORT(pD, m1, in_0_desc);
+  CREATE_PORT(pE, m1, in_1_desc);
+  CREATE_PORT(pF, m1, out_0_desc);
+  CREATE_PORT(pG, m1, out_1_desc);
 
-  CREATE_MODULE(m2, desc2);
-  CREATE_PORT(p3, m2, pdesc20);
-  CREATE_PORT(p4, m2, pdesc21);
+  CREATE_MODULE(m2, mod_desc);
+  CREATE_PORT(pH, m2, in_0_desc);
+  CREATE_PORT(pI, m2, in_1_desc);
+  CREATE_PORT(pJ, m2, out_0_desc);
+
+  CREATE_MODULE(m3, mod_desc);
+  CREATE_PORT(pK, m3, out_0_desc);
+
+  CREATE_MODULE(m4, mod_desc);
+  CREATE_PORT(pL, m4, in_0_desc);
+  CREATE_PORT(pM, m4, out_0_desc);
+
+  CREATE_MODULE(m5, mod_desc);
+  CREATE_PORT(pN, m5, in_0_desc);
+  CREATE_PORT(pO, m5, out_0_desc);
 
   dump_engine(&jack);
 
@@ -135,11 +163,33 @@ int main(int argc, char * const argv[])
   
   dump_engine(&jack);
 
-  TRY_JACK(jack.connect(p0->uid, p1->uid));
-  TRY_JACK(jack.connect(p2->uid, p3->uid));
+  CONNECT(pC, pL);
+  CONNECT(pC, pD);
+
+  CONNECT(pK, pE);
+
+  CONNECT(pM, pH);
+  CONNECT(pF, pI);
+  CONNECT(pG, pA);
+
+  CONNECT(pJ, pN);
+  CONNECT(pO, pB);
+
   TRY_JACK(jack.recompute_process_graph());
   
   dump_engine(&jack);
+
+  fprintf(stderr, "\nProcess frame\n\n");
+  float* physical_io[4];
+  for (size_t i=0; i<4; ++i)
+    physical_io[i] = new float[_block_size];
+
+  TRY_JACK(jack.process_callback(physical_io, physical_io + 2));
+  dump_engine(&jack);
+  
+  for (size_t i=0; i<4; ++i)
+    delete[] physical_io[i];
+
 
   return 0;
 }
