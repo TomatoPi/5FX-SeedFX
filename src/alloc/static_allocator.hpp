@@ -9,7 +9,7 @@ namespace sfx
   {
     struct memblock_desc_t {
       memblock_desc_t*  next;
-      int16_t signed_blocksize;
+      int32_t signed_blocksize;
 
       /// Small hack, this +1 return the first address after this struct,
       ///   which is the memory block itself
@@ -71,7 +71,7 @@ namespace sfx
           header()->free_lst = garbage;
         }
 
-        fprintf(stderr, "Allocated %u bytes in memblock %p\n", size, this);
+        // fprintf(stderr, "Allocated %u bytes in memblock %p\n", size, this);
         // return ptr to allocated memory
         return newblock->memblock();
       }
@@ -85,7 +85,7 @@ namespace sfx
         if (nullptr == desc_ptr || nullptr == *desc_ptr)
           return -1;
 
-        fprintf(stderr, "Freed %u bytes in memblock %p\n", (*desc_ptr)->blocksize(), this);
+        // fprintf(stderr, "Freed %u bytes in memblock %p\n", (*desc_ptr)->blocksize(), this);
         
         // then put the descriptor back to free list
         memblock_desc_t* freedblock =  *desc_ptr;

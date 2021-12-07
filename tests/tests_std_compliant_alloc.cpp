@@ -8,7 +8,7 @@
 
 #define ERROR(fmt, ...) if(1) { fprintf(stderr, fmt, ##__VA_ARGS__); exit(EXIT_FAILURE); }
 
-const size_t memsize = 1 << 14;
+const size_t memsize = 1 << 16;
 uint8_t memory[memsize] = {0};
 sfx::alloc::heterogenous_mempool_adaptator_t main_memory{memory, memsize};
  
@@ -46,6 +46,8 @@ int main()
   main_memory.clear();
 
   std::vector<int, sfx::alloc::static_allocator<int, &main_memory>> v;
+  v.reserve(101);
+  
   v.push_back(42);
 
   dump_memory();
@@ -56,14 +58,16 @@ int main()
 
   for (size_t i=0 ; i<100 ; ++i)
   {
-    printf("%d\n", i);
     v.push_back(i);
-    dump_memory();
   }
   
   for (const auto& x : v)
     printf("%d ", x);
   printf("\n");
+
+  dump_memory();
+  main_memory.optimize_memory();
+  dump_memory();
 
   return 0;
 }
