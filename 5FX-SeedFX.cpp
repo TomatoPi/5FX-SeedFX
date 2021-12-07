@@ -1,4 +1,4 @@
-#include "src/hw/hw.hpp"
+// #include "src/hw/hw.hpp"
 #include "src/Global.hpp"
 // #include "src/Pedalboard.hpp"
 
@@ -18,29 +18,29 @@
 
 daisy::UartHandler uart1;
 
-static serial::messages::Scan::DeviceDescription _SeedFXDeviceDescriptor =
-{
-  {'S', 'e', 'e', 'd', 'F', 'X'},
-  0xA0,
-  1,
+// static serial::messages::Scan::DeviceDescription _SeedFXDeviceDescriptor =
+// {
+//   {'S', 'e', 'e', 'd', 'F', 'X'},
+//   0xA0,
+//   1,
 
-  0
-};
-static uint8_t last_scan_uid = 0xE1;
+//   0
+// };
+// static uint8_t last_scan_uid = 0xE1;
 
-serial::messages::Scan GenerateScanMessage() {
-  serial::messages::Scan msg;
-  msg.device = _SeedFXDeviceDescriptor;
-  msg.scan_uid = ++last_scan_uid;
-  return msg;
-}
+// serial::messages::Scan GenerateScanMessage() {
+//   serial::messages::Scan msg;
+//   msg.device = _SeedFXDeviceDescriptor;
+//   msg.scan_uid = ++last_scan_uid;
+//   return msg;
+// }
 
 using namespace sfx;
 
 constexpr const bool DEBUG_WITH_MIDI = false;
 constexpr const uint32_t MAIN_LOOP_FRAMETIME = 1;
 
-serial::SerialParser serial_in;
+serial::PacketParser serial_in;
 daisy::RingBuffer<serial::Packet, 32> serial_in_buffer;
 daisy::RingBuffer<serial::Packet, 32> serial_out_buffer;
 
@@ -77,7 +77,7 @@ struct
 
 } GlobalSettings;
 
-#include "src/Save.hpp"
+// #include "src/Save.hpp"
 
 const struct
 {
@@ -316,33 +316,33 @@ namespace callbacks
     {
       switch (packet.header[::serial::Packet::Header::Type])
       {
-        case ::serial::messages::Types::Scan :
-        {
-          auto scan = packet.read<::serial::messages::Scan>();
-          if (scan.scan_uid != last_scan_uid)
-          {
-            last_scan_uid = scan.scan_uid;
+        // case ::serial::messages::Types::Scan :
+        // {
+        //   auto scan = packet.read<::serial::messages::Scan>();
+        //   if (scan.scan_uid != last_scan_uid)
+        //   {
+        //     last_scan_uid = scan.scan_uid;
             
-            ::serial::messages::Scan msg;
-            msg.device = _SeedFXDeviceDescriptor;
-            msg.scan_uid = scan.scan_uid;
+        //     ::serial::messages::Scan msg;
+        //     msg.device = _SeedFXDeviceDescriptor;
+        //     msg.scan_uid = scan.scan_uid;
 
-            serial_out_buffer.Write(::serial::Serialize(msg));
-            // TODO : do things with the new peripheral
-          }
-        } break;
+        //     serial_out_buffer.Write(::serial::Serialize(msg));
+        //     // TODO : do things with the new peripheral
+        //   }
+        // } break;
 
-        case ::serial::messages::Types::QueryDevice :
-        {
-          auto query = packet.read<::serial::messages::QueryDevice>();
-          if (_SeedFXDeviceDescriptor.uuid == query.uuid)
-          {
-            for (size_t i=0 ; i < sfx::_descriptors_cout ; ++i)
-            {
-              serial_out_buffer.Write(::serial::Serialize(_descriptors[i]));
-            }
-          }
-        } break;
+        // case ::serial::messages::Types::QueryDevice :
+        // {
+        //   auto query = packet.read<::serial::messages::QueryDevice>();
+        //   if (_SeedFXDeviceDescriptor.uuid == query.uuid)
+        //   {
+        //     for (size_t i=0 ; i < sfx::_descriptors_cout ; ++i)
+        //     {
+        //       serial_out_buffer.Write(::serial::Serialize(_descriptors[i]));
+        //     }
+        //   }
+        // } break;
 
         default :
           break;
@@ -352,7 +352,7 @@ namespace callbacks
 
 } // namespace callbacks
 
-void AudioCallback(float** in, float** out, size_t size)
+void AudioCallback(const float** in, float** out, unsigned int size)
 {
   callbacks::audio::channel_0(in[0], out[0], size);
   callbacks::audio::channel_1(in[1], out[1], size);
@@ -395,8 +395,8 @@ int main(void)
 
   Hardware.StartAudio(AudioCallback);
 
-  _SeedFXDeviceDescriptor.params_count = _descriptors_cout;
-  serial_out_buffer.Write(serial::Serialize(GenerateScanMessage()));
+  // _SeedFXDeviceDescriptor.params_count = _descriptors_cout;
+  // serial_out_buffer.Write(serial::Serialize(GenerateScanMessage()));
 
   SettingsDirtyFlag = false;
 
@@ -408,24 +408,24 @@ int main(void)
     }
     while (uart1.Readable()) {
       uint8_t byte = uart1.PopRx();
-      serial::ParsingResult result = serial_in.parse(byte);
+      // serial::ParsingResult result = serial_in.parse(byte);
 
-      switch (result.status)
-      {
-      case serial::ParsingResult::Status::Running:
-        break;
-      case serial::ParsingResult::Status::Started:
-        // drop = false;
-        break;
-      case serial::ParsingResult::Status::Finished:
-        callbacks::serial::process_input_message(result.packet);
-        break;
-      case serial::ParsingResult::Status::EndOfStream:
-        break;
-      default:
-        serial_in.error(0);
-        break;
-      }
+      // switch (result.status)
+      // {
+      // case serial::ParsingResult::Status::Running:
+      //   break;
+      // case serial::ParsingResult::Status::Started:
+      //   // drop = false;
+      //   break;
+      // case serial::ParsingResult::Status::Finished:
+      //   callbacks::serial::process_input_message(result.packet);
+      //   break;
+      // case serial::ParsingResult::Status::EndOfStream:
+      //   break;
+      // default:
+      //   serial_in.error(0);
+      //   break;
+      // }
     }
     if (Pedalboard::dirtyFlag) {
       Pedalboard::dirtyFlag = false;
@@ -433,10 +433,10 @@ int main(void)
     }
     while (serial_out_buffer.readable()) {
       serial::Packet packet = serial_out_buffer.Read();
-      uart1.PollTx(const_cast<uint8_t*>(packet.serialize()), packet.size());daisy::System::Delay(50);
+      // uart1.PollTx(const_cast<uint8_t*>(packet.serialize()), packet.size());daisy::System::Delay(50);
     }
     if (SettingsDirtyFlag) {
-      persist::SaveToQSPI();
+      // persist::SaveToQSPI();
       SettingsDirtyFlag = false;
     }
     daisy::System::Delay(MAIN_LOOP_FRAMETIME);

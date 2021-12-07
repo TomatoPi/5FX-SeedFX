@@ -2,7 +2,7 @@
 TARGET = 5FX-SeedFX
 
 # Sources
-CPP_SOURCES = src/jack/jack.cpp \
+CPP_SOURCES = src/jack/jack.cpp src/err/err.cpp\
 	5FX-SeedFX2.cpp
 
 # Library Locations

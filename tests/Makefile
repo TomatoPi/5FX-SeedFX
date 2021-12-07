@@ -7,5 +7,5 @@ all:
 
 tests_jack: ../src/jack/jack.cpp
 
-% : %.cpp ../src/err/err.cpp
+% : %.cpp ../src/err/err.cpp ../src/alloc/heterogenous_allocator.hpp
 	g++ $(CXXFLAGS) $^ -o $@

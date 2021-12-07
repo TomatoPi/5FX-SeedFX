@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../alloc/object_pool_allocator.hpp"
-#include "err/err.hpp"
+#include "../err/err.hpp"
 #include "defs.hpp"
 
 namespace sfx
@@ -9,7 +9,7 @@ namespace sfx
   namespace jack
   {
 
-    class engine {
+    class engine_t {
     public:
 
       sfx::alloc::pool_allocator_t<module_id_t> modules_allocator;

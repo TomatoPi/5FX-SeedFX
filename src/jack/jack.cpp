@@ -40,8 +40,9 @@ namespace sfx
 
       struct graph_compute_helpers_t
       {
-
-        using queue_t = sfx::utils::dllist_t<module_id_t>;
+        
+        using node_t = sfx::utils::dlnode_t<module_id_t>;
+        using queue_t = sfx::utils::dllist_t<node_t>;
         using queue_allocator_t = sfx::alloc::pool_allocator_t<int8_t>;
 
         int8_t* ranks;
@@ -71,7 +72,7 @@ namespace sfx
             ranks[i] = 0;
 
           err_t err;
-          if (Success != (err = alloc_pool(&qalloc, sizeof(queue_t::node_t), nodes_pool_size)))
+          if (Success != (err = alloc_pool(&qalloc, sizeof(node_t), nodes_pool_size)))
             return OutOfMemory;
 
           return Success;
@@ -82,11 +83,11 @@ namespace sfx
           if (queue.begin() != queue.end() && queue.back() == module)
             return Success;
 
-          queue_t::node_t* node = (queue_t::node_t*) qalloc.alloc();
+          node_t* node = (node_t*) qalloc.alloc();
           if (nullptr == node)
             return OutOfMemory;
           
-          node->next = node->prev = node;
+          queue_t::init(node);
           node->obj = module;
 
           queue.push_back(node);
@@ -110,7 +111,7 @@ namespace sfx
 
     /// Methods
 
-    err_t engine::init(size_t max_modules_count, size_t max_ports_count)
+    err_t engine_t::init(size_t max_modules_count, size_t max_ports_count)
     {
       blocksize = 0;
       this->max_modules_count = max_modules_count;
@@ -135,7 +136,7 @@ namespace sfx
       return Success;
     }
 
-    err_t engine::deinint()
+    err_t engine_t::deinint()
     {
       err_t err;
       if ((err = impl::free_pool(&modules_allocator))
@@ -153,7 +154,7 @@ namespace sfx
       return Success;
     }
 
-    err_t engine::set_blocksize(size_t blocksize)
+    err_t engine_t::set_blocksize(size_t blocksize)
     {
       blocksize = blocksize;
 
@@ -166,7 +167,7 @@ namespace sfx
       return realloc_buffers();
     }
 
-    err_t engine::realloc_buffers()
+    err_t engine_t::realloc_buffers()
     {
       buffers_allocator.clear();
 
@@ -189,6 +190,10 @@ namespace sfx
           port->buffer = (buffer_t*) rawmem;
           port->buffer->samples = (float*) &rawmem[sizeof(buffer_t)];
         }
+        else
+        {
+          port->buffer = nullptr;
+        }
       }
 
       // Then apply connections
@@ -205,7 +210,7 @@ namespace sfx
       return Success;
     }
 
-    err_t engine::recompute_process_graph()
+    err_t engine_t::recompute_process_graph()
     {
       err_t err;
       {
@@ -261,10 +266,7 @@ namespace sfx
           int8_t module_rank = helpers.ranks[module_index];
 
           if (max_modules_count < (size_t)helpers.rankmax)
-          {
-            snprintf(sfx::errstr, sfx::errstr_size, "Graph computation failure, rankmax overflow");
-            return (err_t)(sfx::errno = Failure);
-          }
+            RETURN_ERROR(Failure, "Graph computation failure, rankmax overflow at module %d", module_index);
 
           fprintf(stderr, "Processing Module %d ... ", module_index);
 
@@ -285,7 +287,7 @@ namespace sfx
             }
           dump_status();
           
-          node->extract();
+          impl::graph_compute_helpers_t::queue_t::extract(node);
           if (0 != helpers.qalloc.free(node))           {
             snprintf(sfx::errstr, sfx::errstr_size, "Free failure at free node");
             return (err_t)(sfx::errno = MemoryError);
@@ -328,7 +330,7 @@ namespace sfx
       return Success;
     }
 
-    module_t* engine::create_module(const module_descriptor_t* desc)
+    module_t* engine_t::create_module(const module_descriptor_t* desc)
     {
       module_t* module = (module_t*)modules_allocator.alloc();
       if (nullptr == module)
@@ -343,7 +345,7 @@ namespace sfx
         return module;
       }
     }
-    err_t engine::destroy_module(module_t* module)
+    err_t engine_t::destroy_module(module_t* module)
     {
       for (port_t* tmp = module->ports; tmp != nullptr; tmp = module->ports)
         if (err_t err = destroy_port(tmp); Success != err)
@@ -353,7 +355,7 @@ namespace sfx
       return Success;
     }
 
-    port_t* engine::create_port(module_t* module, const port_descriptor_t* desc)
+    port_t* engine_t::create_port(module_t* module, const port_descriptor_t* desc)
     {
       port_t* port = (port_t*)ports_allocator.alloc();
       if (nullptr == port)
@@ -374,7 +376,7 @@ namespace sfx
         return port;
       }
     }
-    err_t engine::destroy_port(port_t* port)
+    err_t engine_t::destroy_port(port_t* port)
     {
       port_t** link;
       for (
@@ -391,7 +393,7 @@ namespace sfx
       return Success;
     }
 
-    err_t engine::connect(port_t* src, port_t* dst)
+    err_t engine_t::connect(port_t* src, port_t* dst)
     {
       if (nullptr == src || nullptr == dst)
         return InvalidArguments;
@@ -428,7 +430,7 @@ namespace sfx
 
       return Success;
     }
-    err_t engine::disconnect(port_t* src, port_t* dst)
+    err_t engine_t::disconnect(port_t* src, port_t* dst)
     {
       if (nullptr == src || nullptr == dst)
         return InvalidArguments;
@@ -454,7 +456,7 @@ namespace sfx
       return Success;
     }
 
-    err_t engine::process_callback(const float* const* physical_in, float** physical_out)
+    err_t engine_t::process_callback(const float* const* physical_in, float** physical_out)
     {
       // Fill physical buffers
       float* pio[4] = { const_cast<float*>(physical_in[0]), const_cast<float*>(physical_in[1]),physical_out[0], physical_out[1] };

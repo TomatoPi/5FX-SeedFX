@@ -73,7 +73,7 @@ void dump_module(const sfx::jack::module_t* m)
     dump_port(p);
 }
 
-void dump_engine(sfx::jack::engine* jack)
+void dump_engine(sfx::jack::engine_t* jack)
 {
   fprintf(stderr, "Jack Engine Dump\n");
 
@@ -108,7 +108,7 @@ int main(int argc, char * const argv[])
 {
   _main_allocator = new sfx::alloc::heterogenous_allocator_t(_main_mem, _main_mem_size);
 
-  sfx::jack::engine jack;
+  sfx::jack::engine_t jack;
 
   TRY_JACK(jack.init(_max_modules_count, _max_ports_count));
   print_occupancy();
